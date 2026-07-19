@@ -232,14 +232,20 @@ class CatalogsFeed(AuthFeed):
         items = []
         
         for row in catalogs_list[op.d1_first_pos:op.d1_last_pos+1]:
-            p = {'is_catalog':1, 'title': row.cat_name,'id': row.id, 'cat_type':row.cat_type, 'parent_id':row.parent_id}       
+            p = {'is_catalog':1, 'title': row.cat_name,'id': row.id, 'cat_type':row.cat_type, 'parent_id':row.parent_id}
             items.append(p)
-              
-        for row in books_list[op.d2_first_pos:op.d2_last_pos+1]:
+
+        # Prefetch related rows for the whole page (instead of ~4 queries per book)
+        # and materialise them into the dicts the feed rendering expects.
+        page_books = books_list.prefetch_related('authors', 'genres', 'series', 'bseries_set')
+        for row in page_books[op.d2_first_pos:op.d2_last_pos+1]:
             p = {'is_catalog':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
                   'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
                   'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize//1000,
-                  'authors':row.authors.values(), 'genres':row.genres.values(), 'series':row.series.values(), 'ser_no':row.bseries_set.values('ser_no')}
+                  'authors':[{'id': a.id, 'full_name': a.full_name} for a in row.authors.all()],
+                  'genres':[{'id': g.id, 'subsection': g.subsection} for g in row.genres.all()],
+                  'series':[{'id': s.id, 'ser': s.ser} for s in row.series.all()],
+                  'ser_no':[{'ser_no': b.ser_no} for b in row.bseries_set.all()]}
             items.append(p)
             
         return items, cat, op.get_data_dict()            
@@ -468,11 +474,15 @@ class SearchBooksFeed(AuthFeed):
         start = op.d1_first_pos if ((op.d1_first_pos==0) or (not summary_DOUBLES_HIDE)) else op.d1_first_pos-1
         finish = op.d1_last_pos
         
-        for row in books[start:finish+1]:
+        page_books = books.prefetch_related('authors', 'genres', 'series', 'bseries_set')
+        for row in page_books[start:finish+1]:
             p = {'doubles':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
                   'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
                   'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize//1000,
-                  'authors':row.authors.values(), 'genres':row.genres.values(), 'series':row.series.values(), 'ser_no':row.bseries_set.values('ser_no')}
+                  'authors':[{'id': a.id, 'full_name': a.full_name} for a in row.authors.all()],
+                  'genres':[{'id': g.id, 'subsection': g.subsection} for g in row.genres.all()],
+                  'series':[{'id': s.id, 'ser': s.ser} for s in row.series.all()],
+                  'ser_no':[{'ser_no': b.ser_no} for b in row.bseries_set.all()]}
             if summary_DOUBLES_HIDE:
                 title = p['title'] 
                 authors_set = {a['id'] for a in p['authors']}         

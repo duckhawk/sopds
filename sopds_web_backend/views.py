@@ -2,7 +2,8 @@ from random import randint
 
 from django.shortcuts import render, redirect
 from django.template.context_processors import csrf
-from django.db.models import Count, Min
+from django.core.cache import cache
+from django.db.models import Count, Min, Max, Prefetch
 from django.utils.translation import gettext as _
 from django.contrib.auth import authenticate, login, logout, REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import user_passes_test
@@ -22,6 +23,12 @@ from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
 from sopds_web_backend.settings import HALF_PAGES_LINKS
 from django.http import HttpResponse
+
+
+def theme_css(user):
+    """Return the user's theme css in a single query (instead of exists()+get())."""
+    theme = Theme.objects.filter(user=user).first()
+    return theme.theme_css if theme else "css/sopds.css"
 
 
 def sopds_login(function=None, redirect_field_name=REDIRECT_FIELD_NAME, url=None):
@@ -54,27 +61,39 @@ def sopds_processor(request):
         user = request.user
         if user.is_authenticated:
             result = []
-            for row in bookshelf.objects.filter(user=user).order_by('-readtime')[:8]:
-                book = Book.objects.get(id=row.book_id)
-                p = {'id': row.id, 'readtime': row.readtime, 'book_id': row.book_id, 'title': book.title, 'authors': book.authors.values()}
+            shelf = (bookshelf.objects.filter(user=user)
+                     .select_related('book')
+                     .prefetch_related('book__authors')
+                     .order_by('-readtime')[:8])
+            for row in shelf:
+                book = row.book
+                p = {'id': row.id, 'readtime': row.readtime, 'book_id': row.book_id, 'title': book.title,
+                     'authors': [{'id': a.id, 'full_name': a.full_name} for a in book.authors.all()]}
                 result.append(p)
             args['bookshelf'] = result
-        
-    books_count = Counter.objects.get_counter(models.counter_allbooks)
-    if books_count:
-        random_id = randint(1, books_count)
-        try:
-            random_book = Book.objects.all()[random_id-1:random_id][0]
-        except Book.DoesNotExist:
-            random_book = None
-    else:
+
+    # The stats block and random book are identical for every user and expensive
+    # to compute (a COUNT over all books + a random row lookup), so they run on
+    # every single page render. Cache them for a short period instead.
+    common = cache.get('sopds_processor_common')
+    if common is None:
+        books_count = Counter.objects.get_counter(models.counter_allbooks)
         random_book = None
-                   
-    args['random_book'] = random_book
-    stats = {d['name']: d['value'] for d in Counter.obj.all().values()}
-    stats['lastscan_date'] = Counter.objects.get_lastscan()
-    args['stats'] = stats
-  
+        if books_count:
+            # Avoid LIMIT 1 OFFSET N on a huge table (Postgres physically walks
+            # N rows). Pick a random id and take the first existing row from it.
+            max_id = Book.objects.aggregate(m=Max('id'))['m'] or 0
+            if max_id:
+                random_book = (Book.objects.filter(id__gte=randint(1, max_id)).order_by('id').first()
+                               or Book.objects.order_by('-id').first())
+        stats = {d['name']: d['value'] for d in Counter.obj.all().values()}
+        stats['lastscan_date'] = Counter.objects.get_lastscan()
+        common = {'random_book': random_book, 'stats': stats}
+        cache.set('sopds_processor_common', common, 60)
+
+    args['random_book'] = common['random_book']
+    args['stats'] = common['stats']
+
     return args
 
 
@@ -206,8 +225,18 @@ def SearchBooksView(request):
         summary_DOUBLES_HIDE = config.SOPDS_DOUBLES_HIDE and (searchtype != 'd')
         start = op.d1_first_pos if ((op.d1_first_pos == 0) or (not summary_DOUBLES_HIDE)) else op.d1_first_pos-1
         finish = op.d1_last_pos
-        
-        for row in books[start:finish+1]:
+
+        # Prefetch related rows for the whole page in a handful of queries instead
+        # of ~6 queries per book (authors/genres/series/ser_no/bookshelf x2).
+        prefetch = ['authors', 'genres', 'series', 'bseries_set']
+        if config.SOPDS_AUTH:
+            prefetch.append(Prefetch('bookshelf_set',
+                                     queryset=bookshelf.objects.filter(user=request.user),
+                                     to_attr='user_shelf'))
+        page_books = books.prefetch_related(*prefetch)
+
+        for row in page_books[start:finish+1]:
+            user_shelf = getattr(row, 'user_shelf', []) if config.SOPDS_AUTH else []
             p = {'doubles': 0,
                  'lang_code': row.lang_code,
                  'filename': row.filename,
@@ -219,17 +248,17 @@ def SearchBooksView(request):
                  'format': row.format,
                  'title': row.title,
                  'filesize': row.filesize // 1000,
-                 'authors': row.authors.values(),
-                 'genres': row.genres.values(),
-                 'series': row.series.values(),
-                 'ser_no': row.bseries_set.values('ser_no'),
-                 'bookshelf': row.bookshelf_set.filter(user=request.user).exists() if config.SOPDS_AUTH else False,
-                 'readtime': row.bookshelf_set.filter(user=request.user).values('readtime') if config.SOPDS_AUTH else None
+                 'authors': row.authors.all(),
+                 'genres': row.genres.all(),
+                 'series': row.series.all(),
+                 'ser_no': row.bseries_set.all(),
+                 'bookshelf': bool(user_shelf),
+                 'readtime': user_shelf if config.SOPDS_AUTH else None
                  }
 
             if summary_DOUBLES_HIDE:
                 title = p['title']
-                authors_set = {a['id'] for a in p['authors']}         
+                authors_set = {a.id for a in p['authors']}
                 if title.upper() == prev_title.upper() and authors_set == prev_authors_set:
                     items[-1]['doubles'] += 1
                     if p['bookshelf']:
@@ -265,12 +294,7 @@ def SearchBooksView(request):
             args['cache_t'] = 0
         else:
             args['cache_t'] = config.SOPDS_CACHE_TIME
-        args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(user=request.user).exists() else "css/sopds.css"
-
-
-    from pprint import pprint
-    pprint(args)
-
+        args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_books.html', args)
 
@@ -278,11 +302,10 @@ def SearchBooksView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def ThemeView(request):
-    if Theme.objects.filter(user=request.user).exists():
-        if Theme.objects.get(user=request.user).theme_css == "css/sopds.css":
-            Theme.objects.filter(user=request.user).update(theme_css="css/sopds-dark.css")
-        else:
-            Theme.objects.filter(user=request.user).update(theme_css="css/sopds.css")
+    theme = Theme.objects.filter(user=request.user).first()
+    if theme:
+        theme.theme_css = "css/sopds-dark.css" if theme.theme_css == "css/sopds.css" else "css/sopds.css"
+        theme.save(update_fields=["theme_css"])
     else:
         Theme.objects.create(user=request.user, theme_css="css/sopds-dark.css")
     return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
@@ -331,7 +354,7 @@ def SearchSeriesView(request):
         args['breadcrumbs'] = [_('Series'),_('Search'),searchterms]
         args['cache_id']='%s:%s:%s'%(searchterms,searchtype,op.page_num)
         args['cache_t']=config.SOPDS_CACHE_TIME
-        args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(user=request.user).exists() else "css/sopds.css"
+        args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_series.html', args)
 
@@ -375,7 +398,7 @@ def SearchAuthorsView(request):
         args['breadcrumbs'] = [_('Authors'), _('Search'),searchterms]
         args['cache_id'] = '%s:%s:%s' % (searchterms, searchtype, op.page_num)
         args['cache_t'] = config.SOPDS_CACHE_TIME
-        args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(user=request.user).exists() else "css/sopds.css"
+        args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_authors.html', args)
 
@@ -412,15 +435,24 @@ def CatalogsView(request):
     items = []
     
     for row in catalogs_list[op.d1_first_pos:op.d1_last_pos+1]:
-        p = {'is_catalog':1, 'title': row.cat_name,'id': row.id, 'cat_type':row.cat_type, 'parent_id':row.parent_id}       
+        p = {'is_catalog':1, 'title': row.cat_name,'id': row.id, 'cat_type':row.cat_type, 'parent_id':row.parent_id}
         items.append(p)
-          
-    for row in books_list[op.d2_first_pos:op.d2_last_pos+1]:
+
+    # Prefetch related rows for the page instead of ~5 queries per book.
+    prefetch = ['authors', 'genres', 'series', 'bseries_set']
+    if config.SOPDS_AUTH:
+        prefetch.append(Prefetch('bookshelf_set',
+                                 queryset=bookshelf.objects.filter(user=request.user),
+                                 to_attr='user_shelf'))
+    page_books = books_list.prefetch_related(*prefetch)
+
+    for row in page_books[op.d2_first_pos:op.d2_last_pos+1]:
+        user_shelf = getattr(row, 'user_shelf', []) if config.SOPDS_AUTH else []
         p = {'is_catalog':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
               'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
               'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize//1000,\
-              'authors':row.authors.values(), 'genres':row.genres.values(), 'series':row.series.values(), 'ser_no':row.bseries_set.values('ser_no'),\
-              'readtime': row.bookshelf_set.filter(user=request.user).values('readtime') if config.SOPDS_AUTH else None
+              'authors':row.authors.all(), 'genres':row.genres.all(), 'series':row.series.all(), 'ser_no':row.bseries_set.all(),\
+              'readtime': user_shelf if config.SOPDS_AUTH else None
              }
         items.append(p)
                     
@@ -440,7 +472,7 @@ def CatalogsView(request):
     args['breadcrumbs'] =  [_('Catalogs')]
     args['cache_id'] = '%s:%s:%s' % (args['current'],cat_id, op.page_num)
     args['cache_t'] = config.SOPDS_CACHE_TIME
-    args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(user=request.user).exists() else "css/sopds.css"
+    args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_catalogs.html', args)
 
@@ -479,7 +511,7 @@ def BooksView(request):
     args['breadcrumbs'] =  [_('Books'),_('Select'),lang_menu[lang_code],chars]
     args['cache_id'] = '%s:%s:%s' % (args['current'],lang_code, chars)
     args['cache_t'] = config.SOPDS_CACHE_TIME
-    args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(user=request.user).exists() else "css/sopds.css"
+    args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_selectbook.html', args)
 
@@ -518,8 +550,7 @@ def AuthorsView(request):
     args['breadcrumbs'] =  [_('Authors'),_('Select'),lang_menu[lang_code],chars]
     args['cache_id'] = '%s:%s:%s' % (args['current'],lang_code, chars)
     args['cache_t'] = config.SOPDS_CACHE_TIME
-    args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(
-        user=request.user).exists() else "css/sopds.css"
+    args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_selectauthor.html', args)
 
@@ -558,8 +589,7 @@ def SeriesView(request):
     args['breadcrumbs'] =  [_('Series'),_('Select'),lang_menu[lang_code],chars]
     args['cache_id'] = '%s:%s:%s' % (args['current'],lang_code, chars)
     args['cache_t'] = config.SOPDS_CACHE_TIME
-    args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(
-        user=request.user).exists() else "css/sopds.css"
+    args['css_file'] = theme_css(request.user)
 
     return render(request,'sopds_selectseries.html', args)
 
@@ -587,8 +617,7 @@ def GenresView(request):
     args['parent_id'] = section_id
     args['cache_id'] = '%s:%s' % (args['current'],section_id)
     args['cache_t'] = config.SOPDS_CACHE_TIME
-    args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(
-        user=request.user).exists() else "css/sopds.css"
+    args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_selectgenres.html', args)
 
@@ -652,8 +681,7 @@ def hello(request):
     args = {}
     args['breadcrumbs'] = [_('HOME')]
     if request.user.is_authenticated:
-        args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(
-            user=request.user).exists() else "css/sopds.css"
+        args['css_file'] = theme_css(request.user)
     else:
         args['css_file'] = "css/sopds.css"
     return render(request, 'sopds_hello.html', args)
@@ -705,8 +733,7 @@ def BookReaderView(request, book_id):
     args = {}
     args['current'] = 'reader'
     args['book_id'] = book_id
-    args['css_file'] = Theme.objects.get(user=request.user).theme_css if Theme.objects.filter(
-        user=request.user).exists() else "css/sopds.css"
+    args['css_file'] = theme_css(request.user)
     return render(request, 'BookReader.html', args)
 
 
