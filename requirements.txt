@@ -6,7 +6,7 @@ django-picklefield==3.2
 lxml==6.1.1
 python-telegram-bot==13.14
 six==1.16.0
-psycopg2-binary==2.9.3
-uwsgi==2.0.19.1
+psycopg2-binary==2.9.10
+uwsgi==2.0.28
 raven==6.10.0
 mcp==1.2.0; python_version >= '3.10'
