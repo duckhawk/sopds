@@ -178,7 +178,10 @@ class Command(BaseCommand):
                 return {"error": "Book not found.", "book_id": book_id}
 
             fmt = (format or "orig").lower()
-            filename = dl.getFileName(book)
+            # getFileName derives from book metadata (title/filename), which is
+            # attacker-influenceable; strip any path components so the output
+            # cannot escape target_dir via '..' or an absolute path.
+            filename = os.path.basename(dl.getFileName(book)) or str(book.id)
             if fmt == "orig":
                 document = dl.getFileData(book)
             elif fmt == "zip":
@@ -198,7 +201,10 @@ class Command(BaseCommand):
 
             target_dir = output_dir.strip() or config.SOPDS_TEMP_DIR
             os.makedirs(target_dir, exist_ok=True)
-            out_path = os.path.join(target_dir, filename)
+            out_path = os.path.join(target_dir, os.path.basename(filename))
+            real_dir = os.path.realpath(target_dir)
+            if os.path.commonpath([real_dir, os.path.realpath(out_path)]) != real_dir:
+                return {"error": "Refusing to write outside the target directory."}
             data = document.read()
             document.close()
             with open(out_path, "wb") as fw:
@@ -213,5 +219,12 @@ class Command(BaseCommand):
                 "size": len(data),
             }
 
+        if options['transport'] != 'stdio':
+            self.stderr.write(
+                "WARNING: the '%s' transport exposes the catalog (including file "
+                "download/write tools) over HTTP with no authentication. Only run "
+                "it behind an authenticating reverse proxy; never bind it to a "
+                "public interface." % options['transport']
+            )
         self.stdout.write("Starting SOPDS MCP server (transport=%s)..." % options['transport'])
         mcp.run(transport=options['transport'])
