@@ -1,9 +1,9 @@
-Django>=1.10,<5.0; python_version >= '3.4'
-Pillow>=2.9.0
+Django==4.2.30; python_version >= '3.4'
+Pillow==10.4.0
 apscheduler==3.6.3
 tzlocal==2.1
-django-picklefield
-lxml
+django-picklefield==3.2
+lxml==6.1.1
 python-telegram-bot==13.14
 six==1.16.0
 psycopg2-binary==2.9.3
