@@ -3,6 +3,7 @@ import os
 import codecs
 import base64
 import io
+import shlex
 import subprocess
 import lxml.etree as ET
 from re import search
@@ -24,8 +25,7 @@ from PIL import Image
 from opds_catalog.middleware import BasicAuthMiddleware
 
 
-logger = logging.getLogger('')
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 def getFileName(book):
@@ -70,11 +70,16 @@ def getFileData(book):
             #s = None
             fo = None
 
+    if fo is None:
+        if z: z.close()
+        if fz: fz.close()
+        return None
+
     dio = io.BytesIO()
     dio.write(fo.read())
     dio.seek(0)
 
-    if fo: fo.close()
+    fo.close()
     if z: z.close()
     if fz: fz.close()
 
@@ -126,8 +131,8 @@ def getFileDataConv(book, convert_type):
     fw.close()
     fo.close()
 
-    popen_args = ("%s \"%s\" \"%s\"" % (converter_path, tmp_fb2_path, config.SOPDS_TEMP_DIR))
-    proc = subprocess.Popen(popen_args, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    popen_args = shlex.split(converter_path) + [tmp_fb2_path, config.SOPDS_TEMP_DIR]
+    proc = subprocess.Popen(popen_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     # У следующий строки 2 функции 1-получение информации по конвертации и 2- ожидание конца конвертации
     # В силу 2й функции ее удаление приведет к ошибке выдачи сконвертированного файла
     out = proc.stdout.readlines()
@@ -408,8 +413,8 @@ def ConvertFB2(request, book_id, convert_type):
         file_path=tmp_fb2_path        
         
     tmp_conv_path=os.path.join(config.SOPDS_TEMP_DIR,dlfilename)
-    popen_args = ("\"%s\" \"%s\" \"%s\""%(converter_path,file_path,tmp_conv_path))
-    proc = subprocess.Popen(popen_args, shell=True, stdout=subprocess.PIPE)
+    popen_args = shlex.split(converter_path) + [file_path, tmp_conv_path]
+    proc = subprocess.Popen(popen_args, stdout=subprocess.PIPE)
     #proc = subprocess.Popen((converter_path.encode('utf8'),file_path.encode('utf8'),tmp_conv_path.encode('utf8')), shell=True, stdout=subprocess.PIPE)
     out = proc.stdout.readlines()
 
