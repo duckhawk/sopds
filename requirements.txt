@@ -1,10 +1,16 @@
 Django==4.2.30; python_version >= '3.4'
 Pillow==10.4.0
 apscheduler==3.6.3
+# apscheduler 3.6.3 imports pkg_resources at load; Python 3.12 no longer
+# bundles setuptools, and setuptools>=81 dropped pkg_resources.
+setuptools==75.8.0
 tzlocal==2.1
 django-picklefield==3.2
 lxml==6.1.1
 python-telegram-bot==13.14
+# python-telegram-bot 13.14 vendors urllib3 1.x, whose six.moves shim fails
+# on Python 3.12; it falls back to an external urllib3, which must be <2.
+urllib3==1.26.20
 six==1.16.0
 psycopg2-binary==2.9.10
 uwsgi==2.0.28
