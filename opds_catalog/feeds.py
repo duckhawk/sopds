@@ -12,6 +12,7 @@ from opds_catalog import models
 from opds_catalog import settings
 from opds_catalog.middleware import BasicAuthMiddleware
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
+from opds_catalog.utils import alphabet_menu
 
 from book_tools.format import mime_detector
 from book_tools.format.mimetype import Mimetype
@@ -871,21 +872,7 @@ class BooksFeed(AuthFeed):
         
     def items(self, obj):
         length, chars = obj
-        if self.lang_code:
-            sql="""select %(length)s as l, substring(search_title,1,%(length)s) as id, count(*) as cnt 
-                   from opds_catalog_book 
-                   where lang_code=%(lang_code)s and search_title like '%(chars)s%%%%'
-                   group by substring(search_title,1,%(length)s)
-                   order by id"""%{'length':length, 'lang_code':self.lang_code, 'chars':chars}
-        else:
-            sql="""select %(length)s as l, substring(search_title,1,%(length)s) as id, count(*) as cnt 
-                   from opds_catalog_book 
-                   where search_title like '%(chars)s%%%%'
-                   group by substring(search_title,1,%(length)s)
-                   order by id"""%{'length':length,'chars':chars}
-          
-        dataset = Book.objects.raw(sql)
-        return dataset
+        return alphabet_menu('opds_catalog_book', 'search_title', self.lang_code, chars)
 
     def item_title(self, item):
         return "%s"%item.id
@@ -929,21 +916,7 @@ class AuthorsFeed(AuthFeed):
         
     def items(self, obj):
         length, chars = obj
-        if self.lang_code:
-            sql="""select %(length)s as l, substring(search_full_name,1,%(length)s) as id, count(*) as cnt 
-                   from opds_catalog_author 
-                   where lang_code=%(lang_code)s and search_full_name like '%(chars)s%%%%'
-                   group by substring(search_full_name,1,%(length)s)
-                   order by id"""%{'length':length, 'lang_code':self.lang_code, 'chars':chars}
-        else:
-            sql="""select %(length)s as l, substring(search_full_name,1,%(length)s) as id, count(*) as cnt 
-                   from opds_catalog_author 
-                   where search_full_name like '%(chars)s%%%%'
-                   group by substring(search_full_name,1,%(length)s) 
-                   order by id"""%{'length':length,'chars':chars}
-          
-        dataset = Author.objects.raw(sql)
-        return dataset
+        return alphabet_menu('opds_catalog_author', 'search_full_name', self.lang_code, chars)
 
     def item_title(self, item):
         return "%s"%item.id
@@ -987,21 +960,7 @@ class SeriesFeed(AuthFeed):
         
     def items(self, obj):
         length, chars = obj
-        if self.lang_code:
-            sql="""select %(length)s as l, substring(search_ser,1,%(length)s) as id, count(*) as cnt 
-                   from opds_catalog_series 
-                   where lang_code=%(lang_code)s and search_ser like '%(chars)s%%%%'
-                   group by substring(search_ser,1,%(length)s) 
-                   order by id"""%{'length':length, 'lang_code':self.lang_code, 'chars':chars}
-        else:
-            sql="""select %(length)s as l, substring(search_ser,1,%(length)s) as id, count(*) as cnt 
-                   from opds_catalog_series 
-                   where search_ser like '%(chars)s%%%%'
-                   group by substring(search_ser,1,%(length)s) 
-                   order by id"""%{'length':length,'chars':chars}
-          
-        dataset = Series.objects.raw(sql)
-        return dataset
+        return alphabet_menu('opds_catalog_series', 'search_ser', self.lang_code, chars)
 
     def item_title(self, item):
         return "%s"%item.id
