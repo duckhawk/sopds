@@ -110,13 +110,32 @@
 	// Moon+ Reader stores a per-book position file "<book>.po" with the format
 	//   <timestamp_ms>*<chapter>@<volume>#<char_offset>:<percent>%
 	// Only the percentage is portable between apps (chapter/char_offset use Moon
-	// Reader's own parsing), so we sync on the percentage.
+	// Reader's own parsing). Moon Reader's percentage counts TEXT characters, not
+	// pixels, so we map on cumulative paragraph text length - mapping on pixel
+	// height lands in the wrong place because of images and the page chrome.
 
+	var paragraphs = function(){ return $('#ReaderBlock div[id]').toArray(); };
+
+	var charLen = function(el){ return (el.textContent || '').length; };
+
+	var totalChars = function(divs){
+		var t = 0;
+		for (var i = 0; i < divs.length; i++) t += charLen(divs[i]);
+		return t;
+	};
+
+	// Percentage of the book (by text characters) at the current scroll offset.
 	var currentPercent = function(){
-		var max = document.documentElement.scrollHeight - window.innerHeight;
-		if (max <= 0) return 0;
-		var p = window.scrollY / max * 100;
-		return Math.min(100, Math.max(0, p));
+		var divs = paragraphs();
+		var total = totalChars(divs);
+		if (!total) return 0;
+		var xPos = window.scrollY, before = 0;
+		for (var i = 0; i < divs.length; i++){
+			var $el = $(divs[i]);
+			if (($el.offset().top + $el.height()) > xPos) break;  // first visible paragraph
+			before += charLen(divs[i]);
+		}
+		return Math.min(100, Math.max(0, before / total * 100));
 	};
 
 	// Coarse chapter hint from the first visible paragraph div id ("section.paragraph").
@@ -153,8 +172,15 @@
 			var m = text.match(/:([0-9]+(?:\.[0-9]+)?)%\s*$/);   // percentage before trailing %
 			if (!m){ alert('{% trans "Could not parse .po (no percentage found)" %}'); return; }
 			var pct = parseFloat(m[1]);
-			var max = document.documentElement.scrollHeight - window.innerHeight;
-			window.scrollTo(0, Math.max(0, max * pct / 100));
+			var divs = paragraphs();
+			var total = totalChars(divs);
+			var target = total * pct / 100;
+			var acc = 0, el = divs.length ? divs[divs.length - 1] : null;
+			for (var i = 0; i < divs.length; i++){
+				acc += charLen(divs[i]);
+				if (acc >= target){ el = divs[i]; break; }
+			}
+			if (el) window.scrollTo(0, $(el).offset().top);
 		};
 		reader.readAsText(file);
 		input.value = '';   // allow re-importing the same file
