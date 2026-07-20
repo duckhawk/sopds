@@ -52,19 +52,23 @@ INSTALLED_APPS = [
     'raven.contrib.django.raven_compat',
 ]
 
+# NOTE: Full-page caching (UpdateCacheMiddleware + FetchFromCacheMiddleware) is
+# intentionally NOT enabled. Every page embeds per-user content (bookshelf,
+# theme, random book via the sopds_processor context processor), so caching whole
+# responses risks serving one user's page to another. The previous config had
+# UpdateCacheMiddleware writing to a cache that was never read (FetchFromCache was
+# commented out) — pure overhead — so it is removed. Performance-sensitive shared
+# fragments are cached explicitly instead (see sopds_web_backend.views).
 MIDDLEWARE = [
-    'django.middleware.cache.UpdateCacheMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',    
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
     #'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'opds_catalog.middleware.SOPDSLocaleMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    #'django.middleware.cache.CacheMiddleware',
-    #'opds_catalog.middleware.FetchFromCacheMiddleware',
 ]
 
 ROOT_URLCONF = 'sopds.urls'
@@ -133,6 +137,14 @@ else:
 
 
 
+# Reuse DB connections across requests instead of opening a new TCP+auth
+# connection every request. SOPDS issues many small queries per page, so the
+# per-request connection overhead is significant. Skipped for sqlite (local file).
+# NOTE: in production DATABASES is overridden by sopds/private_settings.py, so the
+# same CONN_MAX_AGE is set there too.
+if DATABASES['default']['ENGINE'] != 'django.db.backends.sqlite3':
+    DATABASES['default'].setdefault('CONN_MAX_AGE', 60)
+
 #### SOPDS DATABASE SETTINGS FINISH ####
 
 # Password validation
@@ -165,7 +177,25 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-CACHE_BACKEND = "locmem://"
+# Cache backend. "CACHE_BACKEND" was a Django <1.3 setting and is ignored by
+# modern Django, so previously no cache was really configured. Use Redis when
+# REDIS_URL is provided (shared across all uWSGI workers), otherwise fall back
+# to a per-process in-memory cache for local development.
+if os.getenv('REDIS_URL'):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': os.getenv('REDIS_URL'),
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'sopds-locmem',
+        }
+    }
+
 CACHE_MIDDLEWARE_KEY_PREFIX = "sopds"
 
 # Static files (CSS, JavaScript, Images)
