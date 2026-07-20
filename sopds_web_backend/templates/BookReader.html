@@ -106,6 +106,63 @@
 			});	
 		}
 	}
+	// --- Moon+ Reader .po interoperability (reading position by percentage) ---
+	// Moon+ Reader stores a per-book position file "<book>.po" with the format
+	//   <timestamp_ms>*<chapter>@<volume>#<char_offset>:<percent>%
+	// Only the percentage is portable between apps (chapter/char_offset use Moon
+	// Reader's own parsing), so we sync on the percentage.
+
+	var currentPercent = function(){
+		var max = document.documentElement.scrollHeight - window.innerHeight;
+		if (max <= 0) return 0;
+		var p = window.scrollY / max * 100;
+		return Math.min(100, Math.max(0, p));
+	};
+
+	// Coarse chapter hint from the first visible paragraph div id ("section.paragraph").
+	var currentChapter = function(){
+		var xPos = window.scrollY, ch = 0;
+		$('#ReaderBlock div[id]').each(function(idx, el){
+			var elem = $(el);
+			if ((elem.offset().top + elem.height()) > xPos){
+				ch = parseInt(($(el).attr('id') || '').split('.')[0], 10) || 0;
+				return false;
+			}
+		});
+		return ch;
+	};
+
+	var ExportPO = function(){
+		var po = Date.now() + '*' + currentChapter() + '@0#0:' + currentPercent().toFixed(1) + '%';
+		var blob = new Blob([po], {type: 'text/plain'});
+		var a = document.createElement('a');
+		a.href = URL.createObjectURL(blob);
+		a.download = '{{ book_filename|escapejs }}.po';
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(a.href);
+	};
+
+	var ImportPO = function(input){
+		var file = input.files && input.files[0];
+		if (!file) return;
+		var reader = new FileReader();
+		reader.onload = function(e){
+			var text = (e.target.result || '').trim();
+			var m = text.match(/:([0-9]+(?:\.[0-9]+)?)%\s*$/);   // percentage before trailing %
+			if (!m){ alert('{% trans "Could not parse .po (no percentage found)" %}'); return; }
+			var pct = parseFloat(m[1]);
+			var max = document.documentElement.scrollHeight - window.innerHeight;
+			window.scrollTo(0, Math.max(0, max * pct / 100));
+		};
+		reader.readAsText(file);
+		input.value = '';   // allow re-importing the same file
+	};
 </script>
+<div id="po-sync" style="position:fixed;bottom:0.6rem;right:0.6rem;z-index:1000;text-align:right;">
+	<a class="button small" href="#" onclick="ExportPO();return false;" style="margin:0 0 .3rem 0;">{% trans "Save position (.po)" %}</a><br>
+	<label class="button small" style="margin:0;cursor:pointer;">{% trans "Load .po" %}<input type="file" accept=".po" onchange="ImportPO(this)" style="display:none;"></label>
+</div>
 <div id="ReaderBlock"><div id="DownloadBook" style="text-align: center;"><img src="{% static "images/download.gif" %}" style="width: 200px;height: 200px;"></div></div>
 {% endblock %}{# body #}

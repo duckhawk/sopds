@@ -692,6 +692,9 @@ def BookReaderView(request, book_id):
     args = {}
     args['current'] = 'reader'
     args['book_id'] = book_id
+    book = Book.objects.filter(id=book_id).first()
+    # Base name for the exported Moon+ Reader .po file (client adds ".po").
+    args['book_filename'] = book.filename if book else str(book_id)
     args['css_file'] = theme_css(request.user)
     return render(request, 'BookReader.html', args)
 
