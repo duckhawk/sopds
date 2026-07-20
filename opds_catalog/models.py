@@ -115,7 +115,11 @@ class bookshelf(models.Model):
     user = models.ForeignKey(User, db_index=True, on_delete=models.CASCADE)
     book = models.ForeignKey(Book, db_index=True, on_delete=models.CASCADE)
     readtime = models.DateTimeField(null=False, default=timezone.now, db_index=True)
-    position = models.FloatField(null=True, default=None)
+    # Reading position is the id of a paragraph <div> in the rendered book, of
+    # the form "<section>.<paragraph>" (e.g. "2.13"). It must be stored as text:
+    # storing it as a float collapsed ids like "1.10" and "1.1" to the same
+    # value and dropped trailing zeros, so the saved position never matched.
+    position = models.CharField(max_length=32, null=True, default=None)
 
     class Meta:
         unique_together = ['user', 'book']

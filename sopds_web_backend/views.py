@@ -605,14 +605,14 @@ def BSDelView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BSSetPos(request, book_id):
-    if request.GET:
-        pos = request.GET.get('pos', None)
-    else:
-        pos = None
+    pos = request.GET.get('pos') if request.GET else None
 
-    pos = float(pos)
-
-    bookshelf.objects.filter(user=request.user, book=book_id).update(position=pos)
+    # `pos` is a paragraph-div id like "2.13" (see FB2_22_xhtml.xsl). Store it
+    # verbatim as text; validate to only accept that shape. update_or_create so
+    # the position is remembered even if the book is not on the shelf yet.
+    if pos and len(pos) <= 32 and all(c in '0123456789.' for c in pos):
+        bookshelf.objects.update_or_create(
+            user=request.user, book_id=book_id, defaults={'position': pos})
 
     response = HttpResponse()
     response.write('OK')
@@ -623,9 +623,9 @@ def BSSetPos(request, book_id):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BSGetPos(request, book_id):
-    pos = bookshelf.objects.get(user=request.user, book=book_id).position
+    shelf = bookshelf.objects.filter(user=request.user, book_id=book_id).first()
     response = HttpResponse()
-    response.write(pos)
+    response.write(shelf.position if shelf and shelf.position else '')
     return response
 
 
