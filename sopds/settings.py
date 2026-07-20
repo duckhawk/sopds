@@ -37,6 +37,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # backward compatibility. Restrict via ALLOWED_HOSTS env in production.
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
+# Behind a TLS-terminating ingress/reverse proxy: trust X-Forwarded-Proto so
+# request.build_absolute_uri() yields https (needed for the OAuth redirect URI
+# to match the one registered in Google Cloud).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.auth',    
@@ -198,6 +204,12 @@ else:
 
 CACHE_MIDDLEWARE_KEY_PREFIX = "sopds"
 
+# Google Drive sync of reading positions (Moon+ Reader .po files). The OAuth
+# client is application-wide (each user authorizes their own Drive); provide it
+# via environment. Empty values simply disable the "Connect Google Drive" UI.
+GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
 STATIC_URL = '/static/'
@@ -218,6 +230,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_BOOK_EXTENSIONS', ('.pdf .djvu .fb2 .epub .mobi', _('List of managed book files extensions'))),
     ('SOPDS_SCAN_START_DIRECTLY', (False,_('Turn once scanning directly'))),
     ('SOPDS_CACHE_TIME', (1200, _('Pages cache time'))),
+    ('SOPDS_GDRIVE_PATH', ('Books/.Moon+/Cache', _('Google Drive folder path where Moon+ Reader .po position files live'))),
 
     ('SOPDS_TELEBOT_API_TOKEN', ('', _('Telegramm API Token'))),
     ('SOPDS_TELEBOT_AUTH', (True,_('Enable telebot authentication. Test presense telegram username in local users database (case insensetive).'))),
@@ -261,7 +274,7 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    '1. General Options': ('SOPDS_LANGUAGE', 'SOPDS_ROOT_LIB', 'SOPDS_BOOK_EXTENSIONS','SOPDS_CACHE_TIME', 'SOPDS_SCAN_START_DIRECTLY'),
+    '1. General Options': ('SOPDS_LANGUAGE', 'SOPDS_ROOT_LIB', 'SOPDS_BOOK_EXTENSIONS','SOPDS_CACHE_TIME', 'SOPDS_GDRIVE_PATH', 'SOPDS_SCAN_START_DIRECTLY'),
     '2. Server Options': ('SOPDS_AUTH', 'SOPDS_ALPHABET_MENU', 'SOPDS_DOUBLES_HIDE', 'SOPDS_COVER_SHOW', 'SOPDS_SPLITITEMS', 'SOPDS_MAXITEMS', 'SOPDS_TITLE_AS_FILENAME', 'SOPDS_NOCOVER_PATH'),    
     '3. Scanner Options': ('SOPDS_FB2SAX','SOPDS_ZIPSCAN','SOPDS_ZIPCODEPAGE', 'SOPDS_INPX_ENABLE', 'SOPDS_INPX_SKIP_UNCHANGED', 'SOPDS_INPX_TEST_ZIP', 'SOPDS_INPX_TEST_FILES', 'SOPDS_DELETE_LOGICAL'),
     '4. Scanner Shedule': ('SOPDS_SCAN_SHED_MIN', 'SOPDS_SCAN_SHED_HOUR', 'SOPDS_SCAN_SHED_DAY','SOPDS_SCAN_SHED_DOW'),

@@ -120,9 +120,24 @@ class bookshelf(models.Model):
     # storing it as a float collapsed ids like "1.10" and "1.1" to the same
     # value and dropped trailing zeros, so the saved position never matched.
     position = models.CharField(max_length=32, null=True, default=None)
+    # Position as a percentage of the book (by text characters). This is the
+    # portable form used to sync with Moon+ Reader .po files. position_time is
+    # when it last changed locally, used for "newer wins" against Drive.
+    position_percent = models.FloatField(null=True, default=None)
+    position_time = models.DateTimeField(null=True, default=None)
 
     class Meta:
         unique_together = ['user', 'book']
+
+
+class GDriveAccount(models.Model):
+    """Per-user Google Drive connection for reading-position sync."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    refresh_token = models.CharField(max_length=512)
+    email = models.CharField(max_length=254, null=True, default=None)
+    # Cached id of the ".../Cache" folder so we don't resolve the path each time.
+    cache_folder_id = models.CharField(max_length=128, null=True, default=None)
+    created = models.DateTimeField(default=timezone.now)
 
 class CounterManager(models.Manager):
     def update(self, counter_name, counter_value):

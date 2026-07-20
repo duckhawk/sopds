@@ -3,6 +3,7 @@ from random import randint
 from django.shortcuts import render, redirect
 from django.template.context_processors import csrf
 from django.core.cache import cache
+from django.utils import timezone
 from django.db.models import Count, Min, Max, Prefetch
 from django.utils.translation import gettext as _
 from django.contrib.auth import authenticate, login, logout, REDIRECT_FIELD_NAME
@@ -15,15 +16,16 @@ from django.http import HttpResponseForbidden, HttpResponseRedirect
 
 
 from opds_catalog import models
-from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalog, Genre, lang_menu, Theme
+from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalog, Genre, lang_menu, Theme, GDriveAccount
 from opds_catalog import settings
+from opds_catalog import gdrive
 from opds_catalog.utils import alphabet_menu
 from constance import config
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
 
 from sopds_web_backend.settings import HALF_PAGES_LINKS
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest
 
 
 def theme_css(user):
@@ -636,6 +638,97 @@ def BSClearView(request):
     return redirect("%s?searchtype=u" % reverse("web:searchbooks"))
 
 
+# --- Google Drive reading-position sync -------------------------------------
+
+@sopds_login(url='web:login')
+def GDriveConnectView(request):
+    if not gdrive.is_configured():
+        return HttpResponseBadRequest('Google Drive sync is not configured')
+    nxt = request.GET.get('next')
+    if nxt:
+        request.session['gdrive_next'] = nxt
+    redirect_uri = request.build_absolute_uri(reverse('web:gdrive_callback'))
+    flow = gdrive.build_flow(redirect_uri)
+    auth_url, state = flow.authorization_url(access_type='offline', prompt='consent')
+    request.session['gdrive_oauth_state'] = state
+    return HttpResponseRedirect(auth_url)
+
+
+@sopds_login(url='web:login')
+def GDriveCallbackView(request):
+    if not gdrive.is_configured():
+        return HttpResponseBadRequest('Google Drive sync is not configured')
+    next_url = request.session.pop('gdrive_next', None) or reverse('web:main')
+    state = request.session.pop('gdrive_oauth_state', None)
+    redirect_uri = request.build_absolute_uri(reverse('web:gdrive_callback'))
+    try:
+        flow = gdrive.build_flow(redirect_uri, state=state)
+        flow.fetch_token(authorization_response=request.build_absolute_uri())
+        refresh_token = flow.credentials.refresh_token
+    except Exception:
+        return redirect(next_url)
+    # refresh_token is only returned on the (prompt=consent) authorization; keep
+    # the existing one if Google omitted it.
+    if refresh_token:
+        email = gdrive.account_email(refresh_token)
+        GDriveAccount.objects.update_or_create(
+            user=request.user,
+            defaults={'refresh_token': refresh_token, 'email': email, 'cache_folder_id': None})
+    return redirect(next_url)
+
+
+@sopds_login(url='web:login')
+def GDriveDisconnectView(request):
+    GDriveAccount.objects.filter(user=request.user).delete()
+    return redirect(request.META.get('HTTP_REFERER') or reverse('web:main'))
+
+
+@sopds_login(url='web:login')
+def GDrivePull(request, book_id):
+    book = Book.objects.filter(id=book_id).first()
+    connected = GDriveAccount.objects.filter(user=request.user).exists()
+    shelf = bookshelf.objects.filter(user=request.user, book_id=book_id).first()
+    result = {'connected': connected,
+              'percent': shelf.position_percent if shelf else None,
+              'source': 'local'}
+    if book and connected:
+        drive = gdrive.pull_position(request.user, book)
+        if drive and drive.get('percent') is not None:
+            local_time = shelf.position_time if shelf else None
+            dmtime = drive.get('mtime')
+            # newer wins: prefer Drive when it changed after the local position
+            if local_time is None or (dmtime is not None and dmtime > local_time):
+                result['percent'] = drive['percent']
+                result['source'] = 'drive'
+    return JsonResponse(result)
+
+
+@sopds_login(url='web:login')
+def GDrivePush(request, book_id):
+    try:
+        percent = float(request.GET.get('percent'))
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False})
+    percent = min(100.0, max(0.0, percent))
+    try:
+        chapter = int(request.GET.get('chapter', '0'))
+    except (TypeError, ValueError):
+        chapter = 0
+
+    book = Book.objects.filter(id=book_id).first()
+    if not book:
+        return JsonResponse({'ok': False})
+
+    bookshelf.objects.update_or_create(
+        user=request.user, book_id=book_id,
+        defaults={'position_percent': percent, 'position_time': timezone.now()})
+
+    pushed = False
+    if GDriveAccount.objects.filter(user=request.user).exists():
+        pushed = gdrive.push_position(request.user, book, percent, chapter)
+    return JsonResponse({'ok': True, 'pushed': pushed})
+
+
 def hello(request):
     args = {}
     args['breadcrumbs'] = [_('HOME')]
@@ -695,6 +788,9 @@ def BookReaderView(request, book_id):
     book = Book.objects.filter(id=book_id).first()
     # Base name for the exported Moon+ Reader .po file (client adds ".po").
     args['book_filename'] = book.filename if book else str(book_id)
+    args['gdrive_configured'] = gdrive.is_configured()
+    args['gdrive_connected'] = (request.user.is_authenticated
+                                and GDriveAccount.objects.filter(user=request.user).exists())
     args['css_file'] = theme_css(request.user)
     return render(request, 'BookReader.html', args)
 

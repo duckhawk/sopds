@@ -16,5 +16,9 @@ psycopg2-binary==2.9.10
 # Used by django.core.cache.backends.redis.RedisCache when REDIS_URL is set.
 redis==5.0.8
 uwsgi==2.0.28
+# Google Drive sync of reading positions (Moon+ Reader .po files).
+google-api-python-client==2.149.0
+google-auth==2.35.0
+google-auth-oauthlib==1.2.1
 raven==6.10.0
 mcp==1.2.0; python_version >= '3.10'

@@ -22,6 +22,11 @@ urlpatterns = [
     re_path(r'^bs/clear/$', views.BSClearView, name='bsclear'),
     re_path(r'^bs/setpos/(?P<book_id>[0-9]+)/$', views.BSSetPos, name='setpos'),
     re_path(r'^bs/getpos/(?P<book_id>[0-9]+)/$', views.BSGetPos, name='getpos'),
+    re_path(r'^gdrive/connect/$', views.GDriveConnectView, name='gdrive_connect'),
+    re_path(r'^gdrive/callback/$', views.GDriveCallbackView, name='gdrive_callback'),
+    re_path(r'^gdrive/disconnect/$', views.GDriveDisconnectView, name='gdrive_disconnect'),
+    re_path(r'^gdrive/pull/(?P<book_id>[0-9]+)/$', views.GDrivePull, name='gdrive_pull'),
+    re_path(r'^gdrive/push/(?P<book_id>[0-9]+)/$', views.GDrivePush, name='gdrive_push'),
     re_path(r'^$',views.hello, name='main'),
 ]
 

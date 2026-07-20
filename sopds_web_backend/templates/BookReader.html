@@ -14,6 +14,7 @@
 				clearTimeout(timeout);
 				timeout = setTimeout(function(){
 					SetPos();
+					PushPos();
 				},delay);
 			});
 		} else {
@@ -63,7 +64,7 @@
 	LoadBook = function(){
 		if (localStorage.getItem(BookID)){
 			$("#ReaderBlock").html(LZString.decompress(localStorage.getItem(BookID)));
-			GetPos();
+			RestorePos();
 		} else {
 			$.ajax( {
 				url: '{% url 'opds_catalog:read' book_id %}',
@@ -100,10 +101,10 @@
 						}
 					}
 					StoreBook();
-					
-					GetPos();
+
+					RestorePos();
 				}
-			});	
+			});
 		}
 	}
 	// --- Moon+ Reader .po interoperability (reading position by percentage) ---
@@ -171,22 +172,69 @@
 			var text = (e.target.result || '').trim();
 			var m = text.match(/:([0-9]+(?:\.[0-9]+)?)%\s*$/);   // percentage before trailing %
 			if (!m){ alert('{% trans "Could not parse .po (no percentage found)" %}'); return; }
-			var pct = parseFloat(m[1]);
-			var divs = paragraphs();
-			var total = totalChars(divs);
-			var target = total * pct / 100;
-			var acc = 0, el = divs.length ? divs[divs.length - 1] : null;
-			for (var i = 0; i < divs.length; i++){
-				acc += charLen(divs[i]);
-				if (acc >= target){ el = divs[i]; break; }
-			}
-			if (el) window.scrollTo(0, $(el).offset().top);
+			scrollToPercent(parseFloat(m[1]));
 		};
 		reader.readAsText(file);
 		input.value = '';   // allow re-importing the same file
 	};
+
+	// Scroll to a text-percentage of the book (paragraph whose cumulative text
+	// length reaches the target).
+	var scrollToPercent = function(pct){
+		var divs = paragraphs();
+		var total = totalChars(divs);
+		if (!total) return;
+		var target = total * pct / 100;
+		var acc = 0, el = divs[divs.length - 1];
+		for (var i = 0; i < divs.length; i++){
+			acc += charLen(divs[i]);
+			if (acc >= target){ el = divs[i]; break; }
+		}
+		if (el) window.scrollTo(0, $(el).offset().top);
+	};
+
+	// Restore position on open: prefer Google Drive when it is newer, otherwise
+	// use the exact local position saved server-side.
+	var RestorePos = function(){
+{% if gdrive_connected %}
+		$.ajax({
+			url: '{% url 'web:gdrive_pull' book_id %}',
+			type: 'GET', cache: false,
+			success: function(r){
+				if (r && r.source === 'drive' && r.percent != null) scrollToPercent(r.percent);
+				else GetPos();
+			},
+			error: function(){ GetPos(); }
+		});
+{% else %}
+		GetPos();
+{% endif %}
+	};
+
+	// Push the current position (percentage) to the server, which mirrors it to
+	// Google Drive as a Moon+ Reader .po file. Throttled so scrolling does not
+	// hammer the Drive API.
+	var lastPush = 0;
+	var PushPos = function(){
+{% if gdrive_connected %}
+		var now = Date.now();
+		if (now - lastPush < 5000) return;
+		lastPush = now;
+		$.ajax({
+			url: '{% url 'web:gdrive_push' book_id %}?percent=' + currentPercent().toFixed(1) + '&chapter=' + currentChapter(),
+			type: 'GET', cache: false
+		});
+{% endif %}
+	};
 </script>
 <div id="po-sync" style="position:fixed;bottom:0.6rem;right:0.6rem;z-index:1000;text-align:right;">
+{% if gdrive_configured %}
+	{% if gdrive_connected %}
+	<a class="button small secondary" href="{% url 'web:gdrive_disconnect' %}" title="{% trans "Disconnect Google Drive" %}" style="margin:0 0 .3rem 0;">{% trans "Drive: on" %}</a><br>
+	{% else %}
+	<a class="button small" href="{% url 'web:gdrive_connect' %}?next={{ request.path|urlencode }}" style="margin:0 0 .3rem 0;">{% trans "Connect Google Drive" %}</a><br>
+	{% endif %}
+{% endif %}
 	<a class="button small" href="#" onclick="ExportPO();return false;" style="margin:0 0 .3rem 0;">{% trans "Save position (.po)" %}</a><br>
 	<label class="button small" style="margin:0;cursor:pointer;">{% trans "Load .po" %}<input type="file" accept=".po" onchange="ImportPO(this)" style="display:none;"></label>
 </div>
