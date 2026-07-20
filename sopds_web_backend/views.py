@@ -729,6 +729,44 @@ def GDrivePush(request, book_id):
     return JsonResponse({'ok': True, 'pushed': pushed})
 
 
+@sopds_login(url='web:login')
+def GDriveView(request):
+    account = GDriveAccount.objects.filter(user=request.user).first()
+    args = {
+        'current': 'gdrive',
+        'breadcrumbs': [_('Google Drive')],
+        'gdrive_configured': gdrive.is_configured(),
+        'gdrive_connected': account is not None,
+        'gdrive_email': account.email if account else None,
+        'gdrive_folder_name': account.folder_name if account else None,
+        'gdrive_folder_id': account.cache_folder_id if account else None,
+        'google_client_id': gdrive.client_id(),
+        'google_api_key': gdrive.api_key(),
+        'css_file': theme_css(request.user),
+    }
+    return render(request, 'sopds_gdrive.html', args)
+
+
+@sopds_login(url='web:login')
+def GDrivePickerToken(request):
+    account = GDriveAccount.objects.filter(user=request.user).first()
+    if not account:
+        return JsonResponse({'ok': False})
+    token = gdrive.picker_access_token(account)
+    return JsonResponse({'ok': bool(token), 'access_token': token or '', 'api_key': gdrive.api_key()})
+
+
+@sopds_login(url='web:login')
+def GDriveSetFolder(request):
+    folder_id = request.GET.get('folder_id')
+    if not folder_id:
+        return JsonResponse({'ok': False})
+    folder_name = (request.GET.get('folder_name') or '')[:256]
+    GDriveAccount.objects.filter(user=request.user).update(
+        cache_folder_id=folder_id, folder_name=folder_name)
+    return JsonResponse({'ok': True})
+
+
 def hello(request):
     args = {}
     args['breadcrumbs'] = [_('HOME')]
@@ -788,9 +826,11 @@ def BookReaderView(request, book_id):
     book = Book.objects.filter(id=book_id).first()
     # Base name for the exported Moon+ Reader .po file (client adds ".po").
     args['book_filename'] = book.filename if book else str(book_id)
+    account = GDriveAccount.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     args['gdrive_configured'] = gdrive.is_configured()
-    args['gdrive_connected'] = (request.user.is_authenticated
-                                and GDriveAccount.objects.filter(user=request.user).exists())
+    args['gdrive_connected'] = account is not None
+    # Sync only runs once a folder has been granted via the Picker.
+    args['gdrive_ready'] = bool(account and account.cache_folder_id)
     args['css_file'] = theme_css(request.user)
     return render(request, 'BookReader.html', args)
 

@@ -196,7 +196,7 @@
 	// Restore position on open: prefer Google Drive when it is newer, otherwise
 	// use the exact local position saved server-side.
 	var RestorePos = function(){
-{% if gdrive_connected %}
+{% if gdrive_ready %}
 		$.ajax({
 			url: '{% url 'web:gdrive_pull' book_id %}',
 			type: 'GET', cache: false,
@@ -216,7 +216,7 @@
 	// hammer the Drive API.
 	var lastPush = 0;
 	var PushPos = function(){
-{% if gdrive_connected %}
+{% if gdrive_ready %}
 		var now = Date.now();
 		if (now - lastPush < 5000) return;
 		lastPush = now;
@@ -229,11 +229,7 @@
 </script>
 <div id="po-sync" style="position:fixed;bottom:0.6rem;right:0.6rem;z-index:1000;text-align:right;">
 {% if gdrive_configured %}
-	{% if gdrive_connected %}
-	<a class="button small secondary" href="{% url 'web:gdrive_disconnect' %}" title="{% trans "Disconnect Google Drive" %}" style="margin:0 0 .3rem 0;">{% trans "Drive: on" %}</a><br>
-	{% else %}
-	<a class="button small" href="{% url 'web:gdrive_connect' %}?next={{ request.path|urlencode }}" style="margin:0 0 .3rem 0;">{% trans "Connect Google Drive" %}</a><br>
-	{% endif %}
+	<a class="button small{% if not gdrive_ready %} secondary{% endif %}" href="{% url 'web:gdrive' %}" title="{% trans "Google Drive sync settings" %}" style="margin:0 0 .3rem 0;">{% if gdrive_ready %}{% trans "Drive: on" %}{% else %}{% trans "Setup Google Drive" %}{% endif %}</a><br>
 {% endif %}
 	<a class="button small" href="#" onclick="ExportPO();return false;" style="margin:0 0 .3rem 0;">{% trans "Save position (.po)" %}</a><br>
 	<label class="button small" style="margin:0;cursor:pointer;">{% trans "Load .po" %}<input type="file" accept=".po" onchange="ImportPO(this)" style="display:none;"></label>

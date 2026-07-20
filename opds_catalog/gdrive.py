@@ -2,17 +2,21 @@
 """
 Per-user Google Drive sync of reading positions with Moon+ Reader.
 
-Moon+ Reader stores a per-book position file in a Drive folder (default
-"Books/.Moon+/Cache", configurable via SOPDS_GDRIVE_PATH) named
-    "<title> - <author full_name>.<format>.zip.po"
-with the content format
-    "<timestamp_ms>*<chapter>@<volume>#<char_offset>:<percent>%".
+Uses the least-privilege ``drive.file`` scope: the app can only touch files it
+created or files/folders the user explicitly grants via the Google Picker. The
+user picks their Moon+ Reader cache folder (default location "Books/.Moon+/Cache")
+once; after that the app can read/write the per-book position files inside it and
+nothing else in the user's Drive.
 
-Only the percentage is portable between apps, so we sync on it. All Drive
-errors are swallowed and logged - a broken sync must never break the reader.
+Position file (Moon+ Reader format), named
+    "<title> - <author full_name>.<format>.zip.po"
+with content
+    "<timestamp_ms>*<chapter>@<volume>#<char_offset>:<percent>%".
+Only the percentage is portable, so we sync on it. All Drive errors are
+swallowed and logged - a broken sync must never break the reader.
 
 Google client libraries are imported lazily so the app still runs where they
-are not installed (e.g. some local dev setups).
+are not installed.
 """
 import datetime
 import logging
@@ -20,21 +24,20 @@ import os
 import re
 import time
 
-# Google may return extra granted scopes (openid/email); relax so the OAuth
-# library does not raise "Scope has changed" during token exchange.
+# Google may return extra granted scopes; relax so the OAuth library does not
+# raise "Scope has changed" during token exchange.
 os.environ.setdefault('OAUTHLIB_RELAX_TOKEN_SCOPE', '1')
 
 from django.conf import settings
-
-from constance import config
 
 from opds_catalog.models import GDriveAccount
 
 logger = logging.getLogger(__name__)
 
-SCOPES = ['https://www.googleapis.com/auth/drive']
+# drive.file: per-file access, limited to what the app creates or the user picks
+# via the Google Picker. This is what keeps access scoped to the chosen folder.
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
 TOKEN_URI = 'https://oauth2.googleapis.com/token'
-FOLDER_MIME = 'application/vnd.google-apps.folder'
 
 PO_PERCENT_RE = re.compile(r':([0-9]+(?:\.[0-9]+)?)%\s*$')
 
@@ -42,6 +45,14 @@ PO_PERCENT_RE = re.compile(r':([0-9]+(?:\.[0-9]+)?)%\s*$')
 def is_configured():
     """True if an application OAuth client is provided."""
     return bool(settings.GOOGLE_OAUTH_CLIENT_ID and settings.GOOGLE_OAUTH_CLIENT_SECRET)
+
+
+def client_id():
+    return settings.GOOGLE_OAUTH_CLIENT_ID
+
+
+def api_key():
+    return settings.GOOGLE_API_KEY
 
 
 def _client_config():
@@ -62,10 +73,9 @@ def build_flow(redirect_uri, state=None):
                                    redirect_uri=redirect_uri, state=state)
 
 
-def _service(account):
+def _credentials(account):
     from google.oauth2.credentials import Credentials
-    from googleapiclient.discovery import build
-    creds = Credentials(
+    return Credentials(
         token=None,
         refresh_token=account.refresh_token,
         token_uri=TOKEN_URI,
@@ -73,7 +83,24 @@ def _service(account):
         client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
         scopes=SCOPES,
     )
-    return build('drive', 'v3', credentials=creds, cache_discovery=False)
+
+
+def _service(account):
+    from googleapiclient.discovery import build
+    return build('drive', 'v3', credentials=_credentials(account), cache_discovery=False)
+
+
+def picker_access_token(account):
+    """Mint a short-lived access token from the stored refresh token, for the
+    browser-side Google Picker (avoids a second in-browser OAuth consent)."""
+    from google.auth.transport.requests import Request
+    creds = _credentials(account)
+    try:
+        creds.refresh(Request())
+        return creds.token
+    except Exception:
+        logger.exception('gdrive: could not mint picker access token')
+        return None
 
 
 def account_email(refresh_token):
@@ -87,7 +114,7 @@ def account_email(refresh_token):
         return None
 
 
-# --- filename / path helpers -------------------------------------------------
+# --- filename / file helpers -------------------------------------------------
 
 def po_filename(book):
     """Build the .po filename Moon+ Reader uses for this book."""
@@ -101,34 +128,6 @@ def po_filename(book):
 
 def _q_escape(value):
     return value.replace('\\', '\\\\').replace("'", "\\'")
-
-
-def _find_child_folder(service, parent_id, name, create):
-    q = ("mimeType='%s' and trashed=false and name='%s' and '%s' in parents"
-         % (FOLDER_MIME, _q_escape(name), parent_id))
-    resp = service.files().list(q=q, spaces='drive', fields='files(id)', pageSize=1).execute()
-    files = resp.get('files', [])
-    if files:
-        return files[0]['id']
-    if not create:
-        return None
-    meta = {'name': name, 'mimeType': FOLDER_MIME, 'parents': [parent_id]}
-    return service.files().create(body=meta, fields='id').execute()['id']
-
-
-def _resolve_cache_folder(service, account, create):
-    if account.cache_folder_id:
-        return account.cache_folder_id
-    parts = [p for p in (config.SOPDS_GDRIVE_PATH or '').strip('/').split('/') if p]
-    parent = 'root'
-    for name in parts:
-        parent = _find_child_folder(service, parent, name, create)
-        if not parent:
-            return None
-    if parent and parent != 'root':
-        account.cache_folder_id = parent
-        account.save(update_fields=['cache_folder_id'])
-    return parent
 
 
 def _find_po(service, folder_id, filename):
@@ -163,14 +162,11 @@ def _build_po(percent, chapter=0):
 def pull_position(user, book):
     """Read the position percentage from Drive. Returns {'percent', 'mtime'} or None."""
     account = GDriveAccount.objects.filter(user=user).first()
-    if not account or not is_configured():
+    if not account or not account.cache_folder_id or not is_configured():
         return None
     try:
         service = _service(account)
-        folder = _resolve_cache_folder(service, account, create=False)
-        if not folder:
-            return None
-        f = _find_po(service, folder, po_filename(book))
+        f = _find_po(service, account.cache_folder_id, po_filename(book))
         if not f:
             return None
         data = service.files().get_media(fileId=f['id']).execute()
@@ -188,21 +184,18 @@ def push_position(user, book, percent, chapter=0):
     """Write the position percentage to Drive. Returns True on success."""
     from googleapiclient.http import MediaInMemoryUpload
     account = GDriveAccount.objects.filter(user=user).first()
-    if not account or not is_configured():
+    if not account or not account.cache_folder_id or not is_configured():
         return False
     try:
         service = _service(account)
-        folder = _resolve_cache_folder(service, account, create=True)
-        if not folder:
-            return False
         filename = po_filename(book)
-        existing = _find_po(service, folder, filename)
+        existing = _find_po(service, account.cache_folder_id, filename)
         media = MediaInMemoryUpload(_build_po(percent, chapter).encode('utf-8'),
                                     mimetype='text/plain', resumable=False)
         if existing:
             service.files().update(fileId=existing['id'], media_body=media).execute()
         else:
-            service.files().create(body={'name': filename, 'parents': [folder]},
+            service.files().create(body={'name': filename, 'parents': [account.cache_folder_id]},
                                    media_body=media, fields='id').execute()
         return True
     except Exception:

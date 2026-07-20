@@ -135,8 +135,10 @@ class GDriveAccount(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     refresh_token = models.CharField(max_length=512)
     email = models.CharField(max_length=254, null=True, default=None)
-    # Cached id of the ".../Cache" folder so we don't resolve the path each time.
+    # Id + name of the folder the user granted via Google Picker (the Moon+
+    # Reader cache folder). Access is scoped to this folder under drive.file.
     cache_folder_id = models.CharField(max_length=128, null=True, default=None)
+    folder_name = models.CharField(max_length=256, null=True, default=None)
     created = models.DateTimeField(default=timezone.now)
 
 class CounterManager(models.Manager):

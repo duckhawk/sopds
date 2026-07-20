@@ -1,0 +1,70 @@
+{% extends "sopds_main.html" %}
+{% load i18n %}
+
+{% block body %}
+<div class="row"><div class="large-8 column">
+	<h4>{% trans "Google Drive sync" %}</h4>
+
+	{% if not gdrive_configured %}
+		<div class="callout warning">
+			{% trans "Google Drive sync is not configured on the server (no OAuth client)." %}
+		</div>
+	{% else %}
+		{% if not gdrive_connected %}
+			<p>{% trans "Sync your reading position with Moon+ Reader through your own Google Drive." %}</p>
+			<a class="button" href="{% url 'web:gdrive_connect' %}?next={{ request.path|urlencode }}">{% trans "Connect Google Drive" %}</a>
+		{% else %}
+			<p>
+				<b>{% trans "Connected" %}</b>{% if gdrive_email %} — {{ gdrive_email }}{% endif %}
+			</p>
+			<p>
+				<b>{% trans "Folder:" %}</b>
+				{% if gdrive_folder_name %}<span class="label">{{ gdrive_folder_name }}</span>{% else %}<i>{% trans "not selected" %}</i>{% endif %}
+			</p>
+			<button class="button" type="button" onclick="pickFolder();return false;">{% trans "Select Moon+ Reader folder" %}</button>
+			<a class="button secondary" href="{% url 'web:gdrive_disconnect' %}">{% trans "Disconnect" %}</a>
+			<p style="font-size:85%;">
+				{% blocktrans %}Pick the folder that contains Moon+ Reader's .po files (usually Books/.Moon+/Cache). The app will only get access to that folder.{% endblocktrans %}
+			</p>
+		{% endif %}
+	{% endif %}
+</div></div>
+{% endblock %}{# body #}
+
+{% block block-js %}
+{% if gdrive_connected %}
+<script src="https://apis.google.com/js/api.js"></script>
+<script>
+	function pickFolder(){
+		fetch("{% url 'web:gdrive_pickertoken' %}", {cache: 'no-store'})
+			.then(function(r){ return r.json(); })
+			.then(function(d){
+				if (!d.ok || !d.access_token){ alert('{% trans "Could not obtain a Google token. Reconnect Google Drive." %}'); return; }
+				gapi.load('picker', function(){ createPicker(d.access_token, d.api_key); });
+			});
+	}
+
+	function createPicker(token, apiKey){
+		var view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+			.setSelectFolderEnabled(true)
+			.setMimeTypes('application/vnd.google-apps.folder');
+		var picker = new google.picker.PickerBuilder()
+			.setOAuthToken(token)
+			.setDeveloperKey(apiKey)
+			.addView(view)
+			.setCallback(pickerCallback)
+			.build();
+		picker.setVisible(true);
+	}
+
+	function pickerCallback(data){
+		if (data.action !== google.picker.Action.PICKED) return;
+		var doc = data.docs[0];
+		fetch("{% url 'web:gdrive_setfolder' %}?folder_id=" + encodeURIComponent(doc.id) +
+		      "&folder_name=" + encodeURIComponent(doc.name), {cache: 'no-store'})
+			.then(function(r){ return r.json(); })
+			.then(function(){ window.location = "{% url 'web:gdrive' %}"; });
+	}
+</script>
+{% endif %}
+{% endblock %}

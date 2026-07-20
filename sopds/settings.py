@@ -209,6 +209,8 @@ CACHE_MIDDLEWARE_KEY_PREFIX = "sopds"
 # via environment. Empty values simply disable the "Connect Google Drive" UI.
 GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
+# API key used by the browser-side Google Picker (folder selection).
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
