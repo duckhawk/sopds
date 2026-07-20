@@ -29,7 +29,7 @@
 	var SetPos = function(){
 		var Reader = $('#ReaderBlock');
 		xPos = window.scrollY;
-		Reader.find('div').each(function(idx,el){
+		Reader.find('div[id]').each(function(idx,el){
 			var elem = $(el);
 			if ((elem.offset().top+elem.height()) > xPos) {
 				var CurrentPos = $(el).attr('id');
@@ -49,8 +49,9 @@
 			type: 'GET',
 			cache: false,
 			success: function(lineID) {
+				if (!lineID) return;
 				var Reader = $('#ReaderBlock');
-				Reader.find('div').each(function(idx,el){
+				Reader.find('div[id]').each(function(idx,el){
 					if ($(el).attr('id') == lineID) {
 						window.scrollTo(0,$(el).offset().top);
 					};
