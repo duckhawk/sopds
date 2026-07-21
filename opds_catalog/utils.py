@@ -11,6 +11,43 @@ from django.db import connection
 from constance import config
 
 
+def contains_page_ids(table, column, term, select_cols, order_by, limit, offset):
+    """Return a page of row ids where `column LIKE '%term%'`, ordered by
+    `order_by`, using an OFFSET-0 fence subquery.
+
+    On PostgreSQL an ``ORDER BY`` combined with a leading-wildcard ``LIKE``
+    makes the planner drive the query off the plain btree index and filter
+    row-by-row, ignoring the pg_trgm GIN index (very slow on large, cyrillic
+    catalogs). Wrapping the filter in a ``(... OFFSET 0)`` fence forces the
+    trigram bitmap scan first and only then sorts the (small) match set.
+
+    `table`, `column`, `select_cols` and `order_by` are fixed identifiers
+    supplied by our own callers — never user input (`select_cols` must list
+    every column referenced by `order_by`). `term` is a bound parameter with
+    its LIKE wildcards escaped.
+    """
+    escaped = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    pattern = '%' + escaped + '%'
+    if connection.vendor == 'postgresql':
+        # The OFFSET 0 fence forces the pg_trgm bitmap scan to run (and the row
+        # set to materialise) before the ORDER BY sort. (PostgreSQL only —
+        # SQLite rejects OFFSET without LIMIT, and has no trigram index anyway.)
+        sql = (
+            "SELECT id FROM ("
+            "  SELECT id, {select_cols} FROM {tbl} WHERE {col} LIKE %s ESCAPE '\\' OFFSET 0"
+            ") t ORDER BY {order} LIMIT %s OFFSET %s"
+        )
+    else:
+        sql = (
+            "SELECT id FROM {tbl} WHERE {col} LIKE %s ESCAPE '\\' "
+            "ORDER BY {order} LIMIT %s OFFSET %s"
+        )
+    sql = sql.format(tbl=table, col=column, select_cols=select_cols, order=order_by)
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [pattern, limit, offset])
+        return [row[0] for row in cursor.fetchall()]
+
+
 def alphabet_menu(table, column, lang_code, chars):
     """Alphabet drill-down counts for the "select by substring" pages/feeds.
 
