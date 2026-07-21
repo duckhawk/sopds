@@ -300,11 +300,9 @@ def SearchBooksView(request):
         # per-user: the list renders this user's shelf/status/rating, so the
         # cached fragment must not be shared between users.
         args['cache_id'] = 'u%s:%s:%s:%s' % (request.user.id, searchterms, searchtype, op.page_num)
-        # changes on bookshelf should be refreshed immediatelly
-        if searchtype == 'u':
-            args['cache_t'] = 0
-        else:
-            args['cache_t'] = config.SOPDS_CACHE_TIME
+        # The list renders this user's mutable state (shelf/status/rating), so it
+        # must not be served stale from cache.
+        args['cache_t'] = 0
         args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_books.html', args)
@@ -511,7 +509,8 @@ def CatalogsView(request):
     args['breadcrumbs_cat'] =  breadcrumbs_list  
     args['breadcrumbs'] =  [_('Catalogs')]
     args['cache_id'] = 'u%s:%s:%s:%s' % (request.user.id, args['current'], cat_id, op.page_num)
-    args['cache_t'] = config.SOPDS_CACHE_TIME
+    # per-user mutable state (shelf/status/rating) is rendered here; don't cache stale
+    args['cache_t'] = 0
     args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_catalogs.html', args)

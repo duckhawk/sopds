@@ -105,7 +105,7 @@
 						<option value="" {% if not b.status %}selected{% endif %}>—</option>
 						<option value="to_read" {% if b.status == 'to_read' %}selected{% endif %}>{% trans "To read" %}</option>
 						<option value="reading" {% if b.status == 'reading' %}selected{% endif %}>{% trans "Reading" %}</option>
-						<option value="read" {% if b.status == 'read' %}selected{% endif %}>{% trans "Read" %}</option>
+						<option value="read" {% if b.status == 'read' %}selected{% endif %}>{% trans "Finished" %}</option>
 					</select>
 					<b>{% trans "Rating:" %}</b>
 					<span class="bs-stars" data-book="{{ b.id }}" data-rating="{{ b.rating|default:0 }}">

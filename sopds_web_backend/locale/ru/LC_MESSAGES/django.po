@@ -380,3 +380,45 @@ msgstr "Учетная запись не активна!"
 #: .\sopds_web_backend\views.py:583
 msgid "User does not exist or the password is incorrect!"
 msgstr "Пользователь не существует или введен неправильный пароль!"
+
+msgid "Light"
+msgstr "Светлая"
+
+msgid "Dark"
+msgstr "Тёмная"
+
+msgid "Reader mode"
+msgstr "Режим чтения"
+
+msgid "Whole text"
+msgstr "Весь текст"
+
+msgid "By chapters"
+msgstr "По главам"
+
+msgid "Reader font size"
+msgstr "Размер шрифта"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "Admin"
+msgstr "Админка"
+
+msgid "Chapter"
+msgstr "Глава"
+
+msgid "Status:"
+msgstr "Статус:"
+
+msgid "Rating:"
+msgstr "Оценка:"
+
+msgid "To read"
+msgstr "Буду читать"
+
+msgid "Reading"
+msgstr "Читаю"
+
+msgid "Finished"
+msgstr "Прочитано"
