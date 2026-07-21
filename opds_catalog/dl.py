@@ -15,7 +15,8 @@ from django.views.decorators.cache import cache_page
 
 from opds_catalog.models import Book, bookshelf
 from opds_catalog import settings, utils, opdsdb, fb2parse
-import opds_catalog.zipf as zipfile
+import zipfile
+from opds_catalog.ziptools import open_zipfile
 
 from book_tools.format import create_bookfile, mime_detector
 from book_tools.format.mimetype import Mimetype
@@ -64,7 +65,7 @@ def getFileData(book):
     elif book.cat_type in [opdsdb.CAT_ZIP, opdsdb.CAT_INP]:
         try:
             fz=codecs.open(full_path, "rb")
-            z = zipfile.ZipFile(fz, 'r', allowZip64=True)
+            z = open_zipfile(fz)
             fo= z.open(book.filename)
             #s=fo.read()
         except FileNotFoundError:
@@ -220,7 +221,7 @@ def Download(request, book_id, zip_flag):
             fz=codecs.open(full_path, "rb")
         except FileNotFoundError:
             raise Http404
-        z = zipfile.ZipFile(fz, 'r', allowZip64=True)
+        z = open_zipfile(fz)
         book_size=z.getinfo(book.filename).file_size
         fo= z.open(book.filename)
         s=fo.read()
@@ -268,7 +269,7 @@ def Cover(request, book_id, thumbnail=False):
             fo.close()
         elif book.cat_type in [opdsdb.CAT_ZIP, opdsdb.CAT_INP]:
             fz = codecs.open(full_path, "rb")
-            z = zipfile.ZipFile(fz, 'r', allowZip64=True)
+            z = open_zipfile(fz)
             fo = z.open(book.filename)
             book_data = create_bookfile(fo, book.filename)
             image = book_data.extract_cover_memory()
@@ -325,7 +326,7 @@ def Cover0(request, book_id, thumbnail = False):
             fo.close()
         elif book.cat_type in [opdsdb.CAT_ZIP, opdsdb.CAT_INP]:
             fz=codecs.open(full_path, "rb")
-            z = zipfile.ZipFile(fz, 'r', allowZip64=True)
+            z = open_zipfile(fz)
             fo = z.open(book.filename)
             fb2.parse(fo,0)
             fo.close()
@@ -413,7 +414,7 @@ def ConvertFB2(request, book_id, convert_type):
             fz=codecs.open(full_path, "rb")
         except FileNotFoundError:
             raise Http404        
-        z = zipfile.ZipFile(fz, 'r', allowZip64=True)
+        z = open_zipfile(fz)
         z.extract(book.filename,config.SOPDS_TEMP_DIR)
         tmp_fb2_path=os.path.join(config.SOPDS_TEMP_DIR,book.filename)
         file_path=tmp_fb2_path        
@@ -492,13 +493,13 @@ def ReadFB2(request, book_id):
             fo=codecs.open(file_path, "rb")
         except FileNotFoundError:
             raise Http404
-        s=fo.read()
+        # NB: do not read fo here — ET.parse(fo) below needs it at position 0.
     elif book.cat_type in [opdsdb.CAT_ZIP, opdsdb.CAT_INP]:
         try:
             fz=codecs.open(full_path, "rb")
         except FileNotFoundError:
             raise Http404
-        z = zipfile.ZipFile(fz, 'r', allowZip64=True)
+        z = open_zipfile(fz)
         book_size=z.getinfo(book.filename).file_size
         fo= z.open(book.filename)
 
