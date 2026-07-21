@@ -181,43 +181,43 @@ class EPub(BookFile):
         try:
             node = xpath('/opf:package/opf:manifest/opf:item[@properties="cover-image"]')
             return image_infos(node)
-        except Exception as err:
+        except Exception:
             pass
 
         try:
             node = xpath('/opf:package/opf:metadata/opf:meta[@name="cover"]')
             return image_infos(xpath('/opf:package/opf:manifest/opf:item[@id="%s"]' % node.get('content')))
-        except Exception as err:
+        except Exception:
             pass
 
         try:
             node = xpath('/opf:package/opf:metadata/meta[@name="cover"]')
             return image_infos(xpath('/opf:package/opf:manifest/opf:item[@id="%s"]' % node.get('content')))
-        except Exception as err:
+        except Exception:
             pass
 
         try:
             node = xpath('/package/metadata/meta[@name="cover"]')
             return image_infos(xpath('/package/manifest/item[@id="%s"]' % node.get('content')))
-        except Exception as err:
+        except Exception:
             pass
 
         try:
             node = xpath('/opf:package/opf:guide/opf:reference[@type="other.ms-coverimage-standard"][@title="Cover"]')
             return image_infos(item_for_href(node.get('href')))
-        except Exception as err:
+        except Exception:
             pass
 
         try:
             node = xpath('/opf:package/opf:guide/opf:reference[@type="other.ms-coverimage-standard"]')
             return image_infos(item_for_href(node.get('href')))
-        except Exception as err:
+        except Exception:
             pass
 
         try:
             node = xpath('/opf:package/opf:manifest/opf:item[@id="cover"]')
             return image_infos(node)
-        except Exception as err:
+        except Exception:
             pass
 
         return []

@@ -1,10 +1,10 @@
 import os
 from io import StringIO
-from opds_catalog.management.commands import sopds_util
 from constance import config
 
 from django.core.management import call_command
 from django.test import TestCase
+
 
 class constanceTestCase(TestCase):
     test_module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

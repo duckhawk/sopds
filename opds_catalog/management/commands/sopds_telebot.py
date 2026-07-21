@@ -21,11 +21,11 @@ from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 from sopds_web_backend.settings import HALF_PAGES_LINKS
 from constance import config
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import InvalidToken
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    CallbackQueryHandler, ContextTypes,
+    CallbackQueryHandler,
 )
 
 query_delimiter = "####"
