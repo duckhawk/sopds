@@ -746,17 +746,23 @@ def SearchSuggestView(request):
     term = (request.POST.get('searchterms') or request.GET.get('searchterms') or '').strip()
     suggesttype = request.POST.get('suggesttype') or request.GET.get('suggesttype') or 'title'
     suggestions = []
-    if len(term) >= 2:
+    # Require >=3 chars: the pg_trgm index needs a full trigram, and 2-char
+    # substrings match too much to be useful. No ORDER BY here on purpose — an
+    # `ORDER BY search_title` makes PostgreSQL drive the query off the plain
+    # btree index and filter LIKE '%..%' row-by-row (slow on large, cyrillic-
+    # heavy catalogs) instead of using the trigram index. Autocomplete does not
+    # need sorted output.
+    if len(term) >= 3:
         up = term.upper()
         base = reverse('web:searchbooks')
         if suggesttype == 'author':
-            for a in Author.objects.filter(search_full_name__contains=up).order_by('search_full_name')[:10]:
+            for a in Author.objects.filter(search_full_name__contains=up)[:10]:
                 suggestions.append({'label': a.full_name, 'url': '%s?searchtype=a&searchterms=%d' % (base, a.id)})
         elif suggesttype == 'series':
-            for s in Series.objects.filter(search_ser__contains=up).order_by('search_ser')[:10]:
+            for s in Series.objects.filter(search_ser__contains=up)[:10]:
                 suggestions.append({'label': s.ser, 'url': '%s?searchtype=s&searchterms=%d' % (base, s.id)})
         else:
-            for b in Book.objects.filter(search_title__contains=up).order_by('search_title')[:10]:
+            for b in Book.objects.filter(search_title__contains=up)[:10]:
                 suggestions.append({'label': b.title, 'url': '%s?searchtype=i&searchterms=%d' % (base, b.id)})
     return render(request, 'sopds_search_suggestions.html', {'suggestions': suggestions})
 
