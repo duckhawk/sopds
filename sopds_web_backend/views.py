@@ -1,6 +1,6 @@
 from random import randint
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.template.context_processors import csrf
 from django.core.cache import cache
 from django.db.models import Count, Min, Max, Prefetch
@@ -189,9 +189,8 @@ def SearchBooksView(request):
                 
         # Поиск дубликатов для книги            
         elif searchtype == 'd':
-            #try:
             book_id = int(searchterms)
-            mbook = Book.objects.get(id=book_id)
+            mbook = get_object_or_404(Book, id=book_id)
             books = Book.objects.filter(title=mbook.title, authors__in=mbook.authors.all()).exclude(id=book_id).distinct().order_by('-docdate')
             args['breadcrumbs'] = [_('Books'),_('Doubles for book'),mbook.title]
             args['searchobject'] = 'title'
@@ -606,7 +605,7 @@ def GenresView(request):
         items = Genre.objects.values('section').annotate(section_id=Min('id'), num_book=Count('book')).filter(num_book__gt=0).order_by('section')
         args['breadcrumbs'] =  [_('Genres'),_('Select')]
     else:
-        section = Genre.objects.get(id=section_id).section
+        section = get_object_or_404(Genre, id=section_id).section
         items = Genre.objects.filter(section=section).annotate(num_book=Count('book')).filter(num_book__gt=0).values().order_by('subsection')   
         args['breadcrumbs'] =  [_('Genres'),_('Select'),section]   
           
