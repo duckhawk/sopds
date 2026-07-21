@@ -3,13 +3,6 @@
 
 {% block body %}
 <script>
-       function del_bsbook(b_id, b_t) {
-           $('#DeleteBook_btnYes').attr("href", "{% url "web:bsdel" %}?book="+b_id);
-           $('#DeleteBook_image').attr("src", "{% url "opds:covertmpl" %}"+b_id+"/");
-           $('#DeleteBook_title').text(b_t);
-           $('#DeleteBookModal').foundation('open');
-       }
-
        function add_bsbook(b_id) {
           $.get("{% url "web:bsadd" %}?book="+b_id,
               function(data, status){
@@ -18,24 +11,6 @@
        }
 </script>
            
-<div id="DeleteBookModal" class="reveal tiny text-center" data-reveal>
-  <h5 id="DeleteBookModalTitle">{% trans "Confirm the deletion of the book to your bookshelf." %}</h5>
-  <table><tr>	
-  <td width="100px" style="padding:0rem 0rem;">
-      <img src="" id="DeleteBook_image" style="max-height: 100px; max-width: 100px">
-  </td> 
-  <td style="font-size:100%; padding:3px">
-      <p id="DeleteBook_title"></p>
-  </td>
-  </tr>
-  </table>
-  <p class="text-center"><a href="#" class="secondary button" id="DeleteBook_btnYes">{% trans "Delete" %}</a>
-                         &nbsp;&nbsp;&nbsp;<a class="close button" data-close>{% trans "Cancel" %}</a></p>
-  <button class="close-button" data-close aria-label="Close modal" type="button">
-    <span aria-hidden="true">&times;</span>
-  </button>
-</div>
-
  {% if isbookshelf %}
  <div id="ConfirmModal" class="reveal tiny text-center" data-reveal>
   <h5 id="ConfirmModalTitle">{% trans "Confirm to clear your bookshelf." %}</h5>
@@ -66,7 +41,11 @@
 			{% endif %}			
             <i><a href="{% url 'web:read' b.id %}"><span class="label small">{% trans "Read" %}</span></a></i>&nbsp;
 			{% if b.bookshelf %}
-			&nbsp;&nbsp;<i><a href="#" onclick="del_bsbook({{ b.id }},'{{b.title}}');"><span class="secondary label small">&nbsp;{% trans "Delete from bookshelf" %}&nbsp;</span></a></i>
+			&nbsp;&nbsp;<i><a href="#"
+			      hx-delete="{% url 'web:bsdel' %}?book={{ b.id }}"
+			      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+			      hx-confirm="{% trans 'Delete this book from your bookshelf?' %} {{ b.title }}"
+			      hx-swap="none"><span class="secondary label small">&nbsp;{% trans "Delete from bookshelf" %}&nbsp;</span></a></i>
             {% else %}
 			&nbsp;&nbsp;<i><a href="{% url "web:bsadd" %}?book={{ b.id }}"><span class="secondary label small">&nbsp;{% trans "Add to bookshelf" %}&nbsp;</span></a></i>
 		    {% endif %}
