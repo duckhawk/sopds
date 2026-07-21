@@ -35,6 +35,12 @@ def test_alphabet_menu_counts_normal_prefix():
     assert counts == {"AL": 1, "AN": 1}
 
 
+# The payload is intentionally used as (part of) a cache key, which Django's
+# cache layer flags as memcached-incompatible. That warning is noise here (the
+# project uses locmem/redis, not memcached), so silence it for this test only.
+@pytest.mark.filterwarnings(
+    "ignore::django.core.cache.backends.base.CacheKeyWarning"
+)
 @pytest.mark.django_db
 def test_alphabet_menu_rejects_sql_injection():
     _make_book("Alpha")
