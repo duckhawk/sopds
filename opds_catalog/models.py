@@ -127,6 +127,13 @@ class bookshelf(models.Model):
     # storing it as a float collapsed ids like "1.10" and "1.1" to the same
     # value and dropped trailing zeros, so the saved position never matched.
     position = models.CharField(max_length=32, null=True, default=None)
+    # Per-user reading status and rating for the book.
+    STATUS_TO_READ = 'to_read'
+    STATUS_READING = 'reading'
+    STATUS_READ = 'read'
+    STATUS_CHOICES = [('', '—'), (STATUS_TO_READ, 'To read'), (STATUS_READING, 'Reading'), (STATUS_READ, 'Read')]
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default='', blank=True)
+    rating = models.PositiveSmallIntegerField(null=True, default=None)  # 1..5
 
     class Meta:
         unique_together = ['user', 'book']
