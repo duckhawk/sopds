@@ -3,7 +3,7 @@ same ordering, paging and doubles-dedup behaviour."""
 import pytest
 from django.urls import reverse
 
-from opds_catalog.models import Book, Catalog, Author, bauthor
+from opds_catalog.models import Book, Catalog, Author, Series, bauthor
 from opds_catalog.utils import contains_page_ids
 
 
@@ -61,3 +61,27 @@ def test_search_m_orders_and_dedups(logged_client, catalog):
     assert 'РОМАН АЛЬФА' in body and 'РОМАН БЕТА' in body
     # the duplicate collapsed into one entry carrying a doubles count
     assert 'шт.' in body
+
+
+@pytest.mark.django_db
+def test_search_authors_m(logged_client):
+    for name in ['Пушкин', 'Пушков', 'Толстой']:
+        Author.objects.create(full_name=name, search_full_name=name.upper())
+    resp = logged_client.get(reverse('web:searchauthors'),
+                             {'searchtype': 'm', 'searchterms': 'ПУШ'})
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    assert 'Пушкин' in body and 'Пушков' in body
+    assert 'Толстой' not in body
+
+
+@pytest.mark.django_db
+def test_search_series_m(logged_client):
+    for s in ['Хоббит', 'Хоррор', 'Дюна']:
+        Series.objects.create(ser=s, search_ser=s.upper())
+    resp = logged_client.get(reverse('web:searchseries'),
+                             {'searchtype': 'm', 'searchterms': 'ХО'})
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    assert 'Хоббит' in body and 'Хоррор' in body
+    assert 'Дюна' not in body

@@ -17,7 +17,7 @@ from django.http import HttpResponseRedirect
 from opds_catalog import models
 from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalog, Genre, lang_menu, Theme
 from opds_catalog import settings
-from opds_catalog.utils import alphabet_menu, contains_page_ids
+from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from constance import config
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
@@ -412,7 +412,14 @@ def SearchSeriesView(request):
         series_count = series.count()
         op = OPDS_Paginator(series_count, 0, page_num, config.SOPDS_MAXITEMS, HALF_PAGES_LINKS)        
         items = []
-        for row in series[op.d1_first_pos:op.d1_last_pos+1]:
+        if searchtype == 'm' and searchterms:
+            page_series = contains_page(Series.objects.annotate(count_book=Count('book')),
+                                        'opds_catalog_series', 'search_ser', searchterms.upper(),
+                                        'search_ser', 'search_ser',
+                                        op.d1_last_pos - op.d1_first_pos + 1, op.d1_first_pos)
+        else:
+            page_series = series[op.d1_first_pos:op.d1_last_pos+1]
+        for row in page_series:
             #p = {'id':row.id, 'ser':row.ser, 'lang_code': row.lang_code, 'book_count': Book.objects.filter(series=row).count()}
             p = {'id':row.id, 'ser':row.ser, 'lang_code': row.lang_code, 'book_count': row.count_book}
             items.append(p)                     
@@ -457,7 +464,13 @@ def SearchAuthorsView(request):
         op = OPDS_Paginator(authors_count, 0, page_num, config.SOPDS_MAXITEMS, HALF_PAGES_LINKS)        
         items = []
         
-        for row in authors[op.d1_first_pos:op.d1_last_pos+1]:
+        if searchtype == 'm' and searchterms:
+            page_authors = contains_page(Author.objects, 'opds_catalog_author', 'search_full_name',
+                                         searchterms.upper(), 'search_full_name', 'search_full_name',
+                                         op.d1_last_pos - op.d1_first_pos + 1, op.d1_first_pos)
+        else:
+            page_authors = authors[op.d1_first_pos:op.d1_last_pos+1]
+        for row in page_authors:
             p = {'id':row.id, 'full_name':row.full_name, 'lang_code': row.lang_code, 'book_count': Book.objects.filter(authors=row).count()}
             items.append(p)                     
             

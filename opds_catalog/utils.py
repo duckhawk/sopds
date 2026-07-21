@@ -48,6 +48,18 @@ def contains_page_ids(table, column, term, select_cols, order_by, limit, offset)
         return [row[0] for row in cursor.fetchall()]
 
 
+def contains_page(base_qs, table, column, term, select_cols, order_by, limit, offset):
+    """Hydrate one ordered page of `base_qs` rows matching `column LIKE
+    '%term%'` via the trgm-friendly fenced id query (see contains_page_ids).
+
+    `base_qs` is the model queryset to load from (already carrying any needed
+    annotations/prefetch); the page is returned in `order_by` order.
+    """
+    ids = contains_page_ids(table, column, term, select_cols, order_by, limit, offset)
+    by_id = {obj.id: obj for obj in base_qs.filter(id__in=ids)}
+    return [by_id[i] for i in ids if i in by_id]
+
+
 def alphabet_menu(table, column, lang_code, chars):
     """Alphabet drill-down counts for the "select by substring" pages/feeds.
 

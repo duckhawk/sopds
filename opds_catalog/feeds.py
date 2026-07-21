@@ -13,7 +13,7 @@ from opds_catalog import models
 from opds_catalog import settings
 from opds_catalog.middleware import BasicAuthMiddleware
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
-from opds_catalog.utils import alphabet_menu
+from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 
 from book_tools.format import mime_detector
 from book_tools.format.mimetype import Mimetype
@@ -479,8 +479,19 @@ class SearchBooksFeed(AuthFeed):
         start = op.d1_first_pos if ((op.d1_first_pos==0) or (not summary_DOUBLES_HIDE)) else op.d1_first_pos-1
         finish = op.d1_last_pos
         
-        page_books = books.prefetch_related('authors', 'genres', 'series', 'bseries_set')
-        for row in page_books[start:finish+1]:
+        lookahead_rows = None
+        if searchtype == 'm' and searchterms:
+            want = finish - start + 1
+            page_ids = contains_page_ids('opds_catalog_book', 'search_title', searchterms.upper(),
+                                         'search_title, docdate', 'search_title, docdate DESC',
+                                         want + 30, start)
+            by_id = {b.id: b for b in Book.objects.filter(id__in=page_ids).prefetch_related('authors', 'genres', 'series', 'bseries_set')}
+            fetched = [by_id[i] for i in page_ids if i in by_id]
+            page_rows = fetched[:want]
+            lookahead_rows = fetched[want:]
+        else:
+            page_rows = books.prefetch_related('authors', 'genres', 'series', 'bseries_set')[start:finish+1]
+        for row in page_rows:
             p = {'doubles':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
                   'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
                   'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize//1000,
@@ -503,12 +514,21 @@ class SearchBooksFeed(AuthFeed):
         # "вытягиваем" дубликаты книг со следующей страницы и удаляем первый элемент который с предыдущей страницы и "вытягивал" дубликаты с текущей
         if summary_DOUBLES_HIDE:
             double_flag = True
-            while ((finish+1)<books_count) and double_flag:
-                finish += 1  
-                if books[finish].title.upper()==prev_title.upper() and {a['id'] for a in books[finish].authors.values()}==prev_authors_set:
-                    items[-1]['doubles']+=1
-                else:
-                    double_flag = False   
+            if lookahead_rows is not None:
+                for nb in lookahead_rows:
+                    if not double_flag:
+                        break
+                    if nb.title.upper()==prev_title.upper() and {a.id for a in nb.authors.all()}==prev_authors_set:
+                        items[-1]['doubles']+=1
+                    else:
+                        double_flag = False
+            else:
+                while ((finish+1)<books_count) and double_flag:
+                    finish += 1
+                    if books[finish].title.upper()==prev_title.upper() and {a['id'] for a in books[finish].authors.values()}==prev_authors_set:
+                        items[-1]['doubles']+=1
+                    else:
+                        double_flag = False
             
             if op.d1_first_pos!=0:     
                 items.pop(0)          
@@ -677,7 +697,13 @@ class SearchAuthorsFeed(AuthFeed):
         op = OPDS_Paginator(authors_count, 0, page_num, config.SOPDS_MAXITEMS)        
         items = []
         
-        for row in authors[op.d1_first_pos:op.d1_last_pos+1]:
+        if searchtype == 'm' and searchterms:
+            page_authors = contains_page(Author.objects, 'opds_catalog_author', 'search_full_name',
+                                         searchterms.upper(), 'search_full_name', 'search_full_name',
+                                         op.d1_last_pos - op.d1_first_pos + 1, op.d1_first_pos)
+        else:
+            page_authors = authors[op.d1_first_pos:op.d1_last_pos+1]
+        for row in page_authors:
             p = {'id':row.id, 'full_name':row.full_name, 'lang_code': row.lang_code, 'book_count': Book.objects.filter(authors=row).count()}
             items.append(p)    
                                 
@@ -755,7 +781,14 @@ class SearchSeriesFeed(AuthFeed):
         op = OPDS_Paginator(series_count, 0, page_num, config.SOPDS_MAXITEMS)        
         items = []
         
-        for row in series[op.d1_first_pos:op.d1_last_pos+1]:
+        if searchtype == 'm' and searchterms:
+            page_series = contains_page(Series.objects.annotate(count_book=Count('book')),
+                                        'opds_catalog_series', 'search_ser', searchterms.upper(),
+                                        'search_ser', 'search_ser',
+                                        op.d1_last_pos - op.d1_first_pos + 1, op.d1_first_pos)
+        else:
+            page_series = series[op.d1_first_pos:op.d1_last_pos+1]
+        for row in page_series:
             p = {'id':row.id, 'ser':row.ser, 'lang_code': row.lang_code, 'book_count': row.count_book}
             items.append(p)   
         
