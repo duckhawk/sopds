@@ -647,11 +647,21 @@ def BSAddView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BSDelView(request):
-    if request.GET and request.GET.get('book', None):
-        book = request.GET.get('book', None)
-        bookshelf.objects.filter(user=request.user, book=int(book)).delete()
+    book = request.GET.get('book') or request.POST.get('book')
+    if book:
+        try:
+            bookshelf.objects.filter(user=request.user, book=int(book)).delete()
+        except (TypeError, ValueError):
+            pass
 
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
+    target = request.META.get('HTTP_REFERER') or reverse('web:main')
+    # For htmx (hx-delete), ask the client to reload via HX-Redirect instead of
+    # returning a normal redirect it would try to swap into the page.
+    if request.headers.get('HX-Request'):
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = target
+        return response
+    return HttpResponseRedirect(target)
 
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
