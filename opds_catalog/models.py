@@ -107,8 +107,15 @@ class bseries(models.Model):
 
 
 class Theme(models.Model):
+    # Per-user preferences (theme + reader settings), edited on /web/settings/.
+    READER_WHOLE = 'whole'
+    READER_CHAPTERS = 'chapters'
+    READER_MODE_CHOICES = [(READER_WHOLE, 'Whole text'), (READER_CHAPTERS, 'By chapters')]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     theme_css = models.CharField(max_length=64, default='css/sopds.css')
+    reader_mode = models.CharField(max_length=16, choices=READER_MODE_CHOICES, default=READER_WHOLE)
+    font_size = models.PositiveSmallIntegerField(default=100)  # percent, 70..200
 
 
 class bookshelf(models.Model):

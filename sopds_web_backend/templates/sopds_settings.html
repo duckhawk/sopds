@@ -1,0 +1,31 @@
+{% extends "sopds_main.html" %}
+{% load i18n %}
+
+{% block body %}
+<div class="row"><div class="large-8 column">
+	<h4>{% trans "Settings" %}</h4>
+	<form method="post" action="{% url 'web:settings' %}">
+		{% csrf_token %}
+
+		<fieldset class="fieldset">
+			<legend>{% trans "Theme" %}</legend>
+			<input type="radio" name="theme" value="light" id="theme_light" {% if not is_dark %}checked{% endif %}><label for="theme_light">{% trans "Light" %}</label>
+			<input type="radio" name="theme" value="dark" id="theme_dark" {% if is_dark %}checked{% endif %}><label for="theme_dark">{% trans "Dark" %}</label>
+		</fieldset>
+
+		<fieldset class="fieldset">
+			<legend>{% trans "Reader mode" %}</legend>
+			<input type="radio" name="reader_mode" value="whole" id="rm_whole" {% if prefs.reader_mode != "chapters" %}checked{% endif %}><label for="rm_whole">{% trans "Whole text" %}</label>
+			<input type="radio" name="reader_mode" value="chapters" id="rm_chapters" {% if prefs.reader_mode == "chapters" %}checked{% endif %}><label for="rm_chapters">{% trans "By chapters" %}</label>
+		</fieldset>
+
+		<fieldset class="fieldset">
+			<legend>{% trans "Reader font size" %}: <span id="fs_val">{{ prefs.font_size }}</span>%</legend>
+			<input type="range" name="font_size" id="font_size" min="70" max="200" step="10" value="{{ prefs.font_size }}"
+			       oninput="document.getElementById('fs_val').textContent=this.value;">
+		</fieldset>
+
+		<button type="submit" class="button">{% trans "Save" %}</button>
+	</form>
+</div></div>
+{% endblock %}{# body #}

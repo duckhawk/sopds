@@ -32,6 +32,12 @@ def theme_css(user):
     return theme.theme_css if theme else "css/sopds.css"
 
 
+def user_prefs(user):
+    """Per-user preferences row (theme + reader settings), created on demand."""
+    prefs, _ = Theme.objects.get_or_create(user=user)
+    return prefs
+
+
 def sopds_login(function=None, redirect_field_name=REDIRECT_FIELD_NAME, url=None):
     actual_decorator = user_passes_test(
         lambda u: (u.is_authenticated if config.SOPDS_AUTH else True),
@@ -310,6 +316,33 @@ def ThemeView(request):
     else:
         Theme.objects.create(user=request.user, theme_css="css/sopds-dark.css")
     return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
+
+
+@vary_on_headers("HTTP_ACCEPT_LANGUAGE")
+@sopds_login(url='web:login')
+def SettingsView(request):
+    prefs = user_prefs(request.user)
+    if request.method == 'POST':
+        prefs.theme_css = 'css/sopds-dark.css' if request.POST.get('theme') == 'dark' else 'css/sopds.css'
+        prefs.reader_mode = (Theme.READER_CHAPTERS if request.POST.get('reader_mode') == Theme.READER_CHAPTERS
+                             else Theme.READER_WHOLE)
+        try:
+            fs = int(request.POST.get('font_size', 100))
+        except (TypeError, ValueError):
+            fs = 100
+        prefs.font_size = min(200, max(70, fs))
+        prefs.save()
+        return redirect(reverse('web:settings'))
+
+    args = {
+        'current': 'settings',
+        'breadcrumbs': [_('Settings')],
+        'prefs': prefs,
+        'is_dark': prefs.theme_css == 'css/sopds-dark.css',
+        'css_file': prefs.theme_css,
+    }
+    args.update(csrf(request))
+    return render(request, 'sopds_settings.html', args)
 
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
@@ -689,10 +722,13 @@ def LogoutView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BookReaderView(request, book_id):
+    prefs = user_prefs(request.user)
     args = {}
     args['current'] = 'reader'
     args['book_id'] = book_id
-    args['css_file'] = theme_css(request.user)
+    args['reader_mode'] = prefs.reader_mode
+    args['font_size'] = prefs.font_size
+    args['css_file'] = prefs.theme_css
     return render(request, 'BookReader.html', args)
 
 
