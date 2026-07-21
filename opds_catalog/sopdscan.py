@@ -14,7 +14,8 @@ from django.utils.translation import gettext as _
 
 from opds_catalog import fb2parse, opdsdb
 from opds_catalog import inpx_parser
-import opds_catalog.zipf as zipfile
+import zipfile
+from opds_catalog.ziptools import open_zipfile
 
 from constance import config
 
@@ -180,7 +181,7 @@ class opdsScanner:
         else:                   
             zip_process_error = 0
             try:
-                z = zipfile.ZipFile(file, 'r', allowZip64=True)
+                z = open_zipfile(file)
                 filelist = z.namelist()
                 cat = opdsdb.addcattree(rel_file, opdsdb.CAT_ZIP, zsize)
                 for n in filelist:
