@@ -16,6 +16,10 @@ lxml==6.1.1
 python-telegram-bot==21.11.1
 # six is required by the vendored django-constance admin.
 six==1.16.0
+# OIDC (Keycloak) web login — see sopds_web_backend/oidc.py. Authlib's Django
+# client uses requests for OIDC discovery and the token/userinfo calls.
+Authlib==1.7.2
+requests==2.34.2
 psycopg2-binary==2.9.10
 # Used by django.core.cache.backends.redis.RedisCache when REDIS_URL is set.
 redis==5.2.1
