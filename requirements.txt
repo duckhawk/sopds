@@ -1,8 +1,7 @@
 Django==5.2.16
 Pillow==11.3.0
-# python-telegram-bot 13.14 hard-pins APScheduler==3.6.3 (and needs tzlocal<3,
-# six, urllib3<2, pkg_resources). Upgrading these requires rewriting the bot on
-# python-telegram-bot 21+, so they stay put until that is done separately.
+# APScheduler powers the sopds_scanner scheduled scans. Pinned to 3.6.x, which
+# needs tzlocal<3 and imports pkg_resources (see the setuptools note below).
 apscheduler==3.6.3
 # apscheduler 3.6.3 imports pkg_resources at load; Python 3.12 no longer
 # bundles setuptools, and setuptools>=81 dropped pkg_resources.
@@ -10,10 +9,10 @@ setuptools==75.8.0
 tzlocal==2.1
 django-picklefield==3.4.0
 lxml==6.1.1
-python-telegram-bot==13.14
-# python-telegram-bot 13.14 vendors urllib3 1.x, whose six.moves shim fails
-# on Python 3.12; it falls back to an external urllib3, which must be <2.
-urllib3==1.26.20
+# Telegram bot: python-telegram-bot 21+ (async, httpx-based). The sopds_telebot
+# command was rewritten for this major version; it no longer pulls urllib3/six.
+python-telegram-bot==21.11.1
+# six is required by the vendored django-constance admin.
 six==1.16.0
 psycopg2-binary==2.9.10
 # Used by django.core.cache.backends.redis.RedisCache when REDIS_URL is set.
