@@ -45,7 +45,7 @@ urlpatterns = [
 
     re_path(r'^search/(?P<searchterms>.+)/$',feeds.SearchTypesFeed(), name='searchtypes'),
     
-    re_path(r'^convert/(?P<book_id>[0-9]+)/(?P<convert_type>.+)/$',dl.ConvertFB2, name='convert'),
+    re_path(r'^convert/(?P<book_id>[0-9]+)/(?P<convert_type>epub|mobi)/$',dl.ConvertFB2, name='convert'),
     re_path(r'^download/(?P<book_id>[0-9]+)/(?P<zip_flag>[0-1])/$',dl.Download, name='download'),
     re_path(r'^cover/(?P<book_id>[0-9]+)/$',dl.Cover, name='cover'),
     re_path(r'^thumb/(?P<book_id>[0-9]+)/$',dl.Thumbnail, name='thumb'),

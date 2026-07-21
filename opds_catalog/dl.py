@@ -397,6 +397,11 @@ def ConvertFB2(request, book_id, convert_type):
         converter_path=config.SOPDS_FB2TOEPUB
     elif convert_type=='mobi':
         converter_path=config.SOPDS_FB2TOMOBI
+    else:
+        # Defence in depth: the URL already restricts convert_type to
+        # epub|mobi, but guard direct calls so converter_path can never be
+        # left unbound (previously raised UnboundLocalError -> 500).
+        raise Http404
     content_type=mime_detector.fmt(convert_type)
 
     if book.cat_type==opdsdb.CAT_NORMAL:
