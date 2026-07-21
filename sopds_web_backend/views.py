@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import user_passes_test
 from django.views.decorators.vary import vary_on_headers
 from django.urls import reverse, reverse_lazy
 from django.utils.html import strip_tags
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.db.models import Q
 from django.http import HttpResponseForbidden, HttpResponseRedirect
 
@@ -722,6 +723,9 @@ def LoginView(request):
         return render(request, 'sopds_login.html', args)
     
     next_url = request.GET.get('next',reverse("web:main"))
+    # Reject off-site ?next= targets to prevent an open redirect after login.
+    if not url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
+        next_url = reverse("web:main")
 
     user = authenticate(username=username, password=password)
     if user is not None:

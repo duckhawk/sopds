@@ -1,0 +1,8 @@
+# Full development environment: all runtime dependencies plus the test
+# toolchain. For a fast, test-only install (what CI uses) see
+# requirements-test.txt.
+#
+#   pip install -r requirements-dev.txt
+#   pytest
+-r requirements.txt
+-r requirements-test.txt

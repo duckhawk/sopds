@@ -1,0 +1,13 @@
+[run]
+# Coverage source is supplied via --cov=... (see the CI workflow / pytest -h).
+omit =
+    */migrations/*
+    */tests/*
+    */management/commands/*
+    # Vendored third-party code kept verbatim (not our logic to cover).
+    opds_catalog/zipf.py
+    opds_catalog/fb2parse.py
+
+[report]
+show_missing = True
+skip_covered = True
