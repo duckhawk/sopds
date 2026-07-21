@@ -1,0 +1,7 @@
+# Development / test dependencies. Install with:
+#   pip install -r requirements.txt -r requirements-dev.txt
+# Run the test suite with:
+#   pytest
+-r requirements.txt
+pytest==9.1.1
+pytest-django==4.12.0
