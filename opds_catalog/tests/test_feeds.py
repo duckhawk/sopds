@@ -5,7 +5,6 @@ from django.test import TestCase, Client
 from django.utils.translation import gettext as _
 
 from opds_catalog import opdsdb
-from opds_catalog import settings
 from constance import config
 
 

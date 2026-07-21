@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/1.9/ref/settings/
 """
 
 import os
-import sys
 from collections import OrderedDict
 
 from django.utils.translation import gettext_lazy as _

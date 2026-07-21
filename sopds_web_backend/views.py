@@ -11,8 +11,7 @@ from django.views.decorators.vary import vary_on_headers
 from django.urls import reverse, reverse_lazy
 from django.utils.html import strip_tags
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.db.models import Q
-from django.http import HttpResponseForbidden, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 
 
 from opds_catalog import models
@@ -25,6 +24,15 @@ from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
 from sopds_web_backend.settings import HALF_PAGES_LINKS
 from django.http import HttpResponse, JsonResponse, Http404
+
+
+def _int_param(request, name, default=0):
+    """Parse an integer GET parameter, falling back to `default` on a missing
+    or non-numeric value (instead of raising ValueError -> HTTP 500)."""
+    try:
+        return int(request.GET.get(name, default))
+    except (TypeError, ValueError):
+        return default
 
 
 def theme_css(user):
@@ -116,7 +124,7 @@ def SearchBooksView(request):
         searchtype = request.GET.get('searchtype', 'm')
         searchterms = request.GET.get('searchterms', '')
         #searchterms0 = int(request.POST.get('searchterms0', ''))
-        page_num = int(request.GET.get('page', '1'))
+        page_num = _int_param(request, 'page', 1)
         page_num = page_num if page_num>0 else 1
         
         #if (len(searchterms)<3) and (searchtype in ('m', 'b', 'e')):
@@ -361,7 +369,7 @@ def SearchSeriesView(request):
         searchtype = request.GET.get('searchtype', 'm')
         searchterms = request.GET.get('searchterms', '')
         #searchterms0 = int(request.POST.get('searchterms0', ''))
-        page_num = int(request.GET.get('page', '1'))
+        page_num = _int_param(request, 'page', 1)
         page_num = page_num if page_num>0 else 1
         
         if searchtype == 'm':
@@ -409,7 +417,7 @@ def SearchAuthorsView(request):
         searchtype = request.GET.get('searchtype', 'm')
         searchterms = request.GET.get('searchterms', '')
         #searchterms0 = int(request.POST.get('searchterms0', ''))
-        page_num = int(request.GET.get('page', '1'))
+        page_num = _int_param(request, 'page', 1)
         page_num = page_num if page_num>0 else 1
         
         if searchtype == 'm':
@@ -449,7 +457,7 @@ def CatalogsView(request):
 
     if request.GET:
         cat_id = request.GET.get('cat', None)
-        page_num = int(request.GET.get('page', '1'))   
+        page_num = _int_param(request, 'page', 1)   
     else:
         cat_id = None
         page_num = 1
@@ -525,7 +533,7 @@ def BooksView(request):
     args = {}
 
     if request.GET:
-        lang_code = int(request.GET.get('lang', '0'))  
+        lang_code = _int_param(request, 'lang', 0)  
         chars = request.GET.get('chars', '')
     else:
         lang_code = 0
@@ -550,7 +558,7 @@ def AuthorsView(request):
     args = {}
 
     if request.GET:
-        lang_code = int(request.GET.get('lang', '0'))  
+        lang_code = _int_param(request, 'lang', 0)  
         chars = request.GET.get('chars', '')
     else:
         lang_code = 0
@@ -575,7 +583,7 @@ def SeriesView(request):
     args = {}
 
     if request.GET:
-        lang_code = int(request.GET.get('lang', '0'))  
+        lang_code = _int_param(request, 'lang', 0)  
         chars = request.GET.get('chars', '')
     else:
         lang_code = 0

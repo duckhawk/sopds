@@ -2,7 +2,6 @@
 #
 # Вспомогательные функции
 #
-import unicodedata
 
 from types import SimpleNamespace
 

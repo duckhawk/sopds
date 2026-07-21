@@ -4,13 +4,17 @@
 target-version = "py312"
 line-length = 120
 # Vendored / generated code kept verbatim — not ours to lint.
-extend-exclude = ["constance", "convert", "static", "*/migrations/*"]
+extend-exclude = ["constance", "convert", "static", "book_tools/pymobi", "*/migrations/*"]
 
 [tool.ruff.lint]
 # Conservative baseline: syntax errors (E9) + pyflakes (F) catch real problems
 # (unused imports, undefined names) without style noise. Style/isort/bugbear
 # rules can be enabled incrementally as the legacy code is cleaned up.
 select = ["E9", "F"]
+# F841 (assigned-but-unused local) is noisy here and often intentional
+# (side-effecting calls whose result is discarded, e.g. proc.stdout.readlines()
+# in dl.py). Left advisory rather than blocking to avoid risky edits.
+ignore = ["F841"]
 
 [tool.ruff.lint.per-file-ignores]
 # Re-exports in package inits.

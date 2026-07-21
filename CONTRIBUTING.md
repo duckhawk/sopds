@@ -18,7 +18,7 @@ pytest --cov=opds_catalog --cov=sopds_web_backend --cov=book_tools --cov-report=
 ```
 
 CI runs the same suite on Python 3.12 for every pull request, plus a
-non-blocking `ruff` lint pass.
+`ruff` lint pass (blocking).
 
 ## Linting / type-checking
 
@@ -30,8 +30,8 @@ ruff check .          # syntax errors + pyflakes (E9, F)
 mypy opds_catalog sopds_web_backend book_tools   # lenient; tighten over time
 ```
 
-`ruff` is currently advisory (the pipeline does not fail on findings) so the
-legacy code can be cleaned up incrementally. Please don't add new findings.
+`ruff check .` is enforced in CI (rules `E9`, `F`, excluding the noisy `F841`).
+Keep it clean.
 
 ## Conventions
 
