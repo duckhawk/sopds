@@ -10,6 +10,7 @@ from re import search
 import logging
 
 from django.http import HttpResponse, Http404
+from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import cache_page
 
 from opds_catalog.models import Book, bookshelf
@@ -163,7 +164,7 @@ def getFileDataMobi(book):
 
 def Download(request, book_id, zip_flag):
     """ Загрузка файла книги """
-    book = Book.objects.get(id=book_id)
+    book = get_object_or_404(Book, id=book_id)
 
     if config.SOPDS_AUTH:
         if not request.user.is_authenticated:
@@ -247,7 +248,7 @@ def Download(request, book_id, zip_flag):
 @cache_page(config.SOPDS_CACHE_TIME)
 def Cover(request, book_id, thumbnail=False):
     """ Загрузка обложки """
-    book = Book.objects.get(id=book_id)
+    book = get_object_or_404(Book, id=book_id)
     response = HttpResponse()
     full_path = os.path.join(config.SOPDS_ROOT_LIB, book.path)
     if book.cat_type == opdsdb.CAT_INP:
@@ -304,7 +305,7 @@ def Cover(request, book_id, thumbnail=False):
 # Старая версия (до 0.41) процедуры извлечения обложек из файлов книг только fb2
 def Cover0(request, book_id, thumbnail = False):
     """ Загрузка обложки """
-    book = Book.objects.get(id=book_id)
+    book = get_object_or_404(Book, id=book_id)
     response = HttpResponse()
     c0=0
     full_path=os.path.join(config.SOPDS_ROOT_LIB,book.path)
@@ -367,7 +368,7 @@ def Thumbnail(request, book_id):
 
 def ConvertFB2(request, book_id, convert_type):
     """ Выдача файла книги после конвертации в EPUB или mobi """
-    book = Book.objects.get(id=book_id)
+    book = get_object_or_404(Book, id=book_id)
     
     if book.format!='fb2':
         raise Http404
@@ -452,7 +453,7 @@ def ConvertFB2(request, book_id, convert_type):
 
 def ReadFB2(request, book_id):
     """ Загрузка книги """
-    book = Book.objects.get(id=book_id)
+    book = get_object_or_404(Book, id=book_id)
 
     if config.SOPDS_AUTH and request.user.is_authenticated:
         bookshelf.objects.get_or_create(user=request.user, book=book)
