@@ -1,9 +1,11 @@
 Django==5.2.16
 Pillow==11.3.0
-# APScheduler powers the sopds_scanner scheduled scans. Pinned to 3.6.x, which
-# needs tzlocal<3 and imports pkg_resources (see the setuptools note below).
-apscheduler==3.6.3
-# apscheduler 3.6.3 imports pkg_resources at load; Python 3.12 no longer
+# APScheduler: used by sopds_scanner (scheduled scans) and required by
+# python-telegram-bot 21's JobQueue (needs >=3.10.4). 3.10.x accepts stdlib/
+# zoneinfo timezones (3.6.x only accepted pytz, which crashed the bot on the
+# container's local timezone) and pulls pytz/tzlocal itself. Keeps tzlocal<3.
+apscheduler==3.10.4
+# apscheduler still imports pkg_resources at load; Python 3.12 no longer
 # bundles setuptools, and setuptools>=81 dropped pkg_resources.
 setuptools==75.8.0
 tzlocal==2.1
