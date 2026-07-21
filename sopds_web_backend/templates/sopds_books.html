@@ -98,6 +98,21 @@
 				{% if b.readtime %}
                     <b>{% trans "Read date:" %}</b> <span class="label small">{{ b.readtime.0.readtime }}</span><br>
 				{% endif %}
+				{% if sopds_auth %}
+				<div class="bs-controls" style="margin-top:.3rem;">
+					<b>{% trans "Status:" %}</b>
+					<select onchange="bsSetStatus({{ b.id }}, this.value)" style="width:auto;display:inline-block;height:auto;padding:.1rem .3rem;margin:0 .6rem 0 .2rem;font-size:100%;">
+						<option value="" {% if not b.status %}selected{% endif %}>—</option>
+						<option value="to_read" {% if b.status == 'to_read' %}selected{% endif %}>{% trans "To read" %}</option>
+						<option value="reading" {% if b.status == 'reading' %}selected{% endif %}>{% trans "Reading" %}</option>
+						<option value="read" {% if b.status == 'read' %}selected{% endif %}>{% trans "Read" %}</option>
+					</select>
+					<b>{% trans "Rating:" %}</b>
+					<span class="bs-stars" data-book="{{ b.id }}" data-rating="{{ b.rating|default:0 }}">
+						{% for n in "12345" %}<a href="#" class="bs-star" data-n="{{ forloop.counter }}" onclick="bsSetRating({{ b.id }}, {{ forloop.counter }});return false;" style="text-decoration:none;font-size:130%;color:#f15a23;">&#9734;</a>{% endfor %}
+					</span>
+				</div>
+				{% endif %}
 
 			</td>
 			</tr>
@@ -135,3 +150,43 @@
 {% endif %}
 
 {% endblock %}  {# body #}
+
+{% block block-js %}
+<script>
+	var BS_STATUS_URL = "{% url 'web:bsstatus' 0 %}";
+	var BS_RATING_URL = "{% url 'web:bsrating' 0 %}";
+
+	function bsCookie(name){
+		var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+		return m ? m.pop() : '';
+	}
+	function bsPost(url, data, cb){
+		var body = Object.keys(data).map(function(k){ return encodeURIComponent(k) + '=' + encodeURIComponent(data[k]); }).join('&');
+		fetch(url, {
+			method: 'POST',
+			headers: {'X-CSRFToken': bsCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+			body: body
+		}).then(function(r){ return r.json(); }).then(cb).catch(function(){});
+	}
+	function bsSetStatus(id, val){
+		bsPost(BS_STATUS_URL.replace('/0/', '/' + id + '/'), {status: val}, function(){});
+	}
+	function bsRenderStars(container){
+		var r = parseInt(container.getAttribute('data-rating'), 10) || 0;
+		container.querySelectorAll('.bs-star').forEach(function(a){
+			a.innerHTML = (parseInt(a.getAttribute('data-n'), 10) <= r) ? '★' : '☆';
+		});
+	}
+	function bsSetRating(id, n){
+		var c = document.querySelector('.bs-stars[data-book="' + id + '"]');
+		var cur = parseInt(c.getAttribute('data-rating'), 10) || 0;
+		var val = (n === cur) ? 0 : n;   // click the current top star to clear
+		bsPost(BS_RATING_URL.replace('/0/', '/' + id + '/'), {rating: val}, function(res){
+			if (res && res.ok){ c.setAttribute('data-rating', res.rating || 0); bsRenderStars(c); }
+		});
+	}
+	document.addEventListener('DOMContentLoaded', function(){
+		document.querySelectorAll('.bs-stars').forEach(bsRenderStars);
+	});
+</script>
+{% endblock %}

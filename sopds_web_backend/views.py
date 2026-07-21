@@ -23,7 +23,7 @@ from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
 
 from sopds_web_backend.settings import HALF_PAGES_LINKS
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 
 def theme_css(user):
@@ -260,7 +260,9 @@ def SearchBooksView(request):
                  'series': row.series.all(),
                  'ser_no': row.bseries_set.all(),
                  'bookshelf': bool(user_shelf),
-                 'readtime': user_shelf if config.SOPDS_AUTH else None
+                 'readtime': user_shelf if config.SOPDS_AUTH else None,
+                 'status': user_shelf[0].status if user_shelf else '',
+                 'rating': user_shelf[0].rating if user_shelf else None
                  }
 
             if summary_DOUBLES_HIDE:
@@ -295,7 +297,9 @@ def SearchBooksView(request):
         args['searchtype'] = searchtype
         args['books'] = items
         args['current'] = 'search'
-        args['cache_id'] = '%s:%s:%s' % (searchterms, searchtype, op.page_num)
+        # per-user: the list renders this user's shelf/status/rating, so the
+        # cached fragment must not be shared between users.
+        args['cache_id'] = 'u%s:%s:%s:%s' % (request.user.id, searchterms, searchtype, op.page_num)
         # changes on bookshelf should be refreshed immediatelly
         if searchtype == 'u':
             args['cache_t'] = 0
@@ -486,7 +490,9 @@ def CatalogsView(request):
               'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
               'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize//1000,\
               'authors':row.authors.all(), 'genres':row.genres.all(), 'series':row.series.all(), 'ser_no':row.bseries_set.all(),\
-              'readtime': user_shelf if config.SOPDS_AUTH else None
+              'readtime': user_shelf if config.SOPDS_AUTH else None,
+              'status': user_shelf[0].status if user_shelf else '',
+              'rating': user_shelf[0].rating if user_shelf else None
              }
         items.append(p)
                     
@@ -504,7 +510,7 @@ def CatalogsView(request):
     #breadcrumbs_list.insert(0, (_('Catalogs'),-1))    
     args['breadcrumbs_cat'] =  breadcrumbs_list  
     args['breadcrumbs'] =  [_('Catalogs')]
-    args['cache_id'] = '%s:%s:%s' % (args['current'],cat_id, op.page_num)
+    args['cache_id'] = 'u%s:%s:%s:%s' % (request.user.id, args['current'], cat_id, op.page_num)
     args['cache_t'] = config.SOPDS_CACHE_TIME
     args['css_file'] = theme_css(request.user)
 
@@ -667,6 +673,32 @@ def BSGetPos(request, book_id):
 def BSClearView(request):
     bookshelf.objects.filter(user=request.user).delete()
     return redirect("%s?searchtype=u" % reverse("web:searchbooks"))
+
+
+@sopds_login(url='web:login')
+def BSSetStatus(request, book_id):
+    status = request.POST.get('status', '')
+    valid = {c[0] for c in bookshelf.STATUS_CHOICES}
+    if status not in valid:
+        return JsonResponse({'ok': False})
+    obj, _ = bookshelf.objects.get_or_create(user=request.user, book_id=book_id)
+    obj.status = status
+    obj.save(update_fields=['status'])
+    return JsonResponse({'ok': True, 'status': status})
+
+
+@sopds_login(url='web:login')
+def BSSetRating(request, book_id):
+    try:
+        rating = int(request.POST.get('rating'))
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False})
+    if rating < 0 or rating > 5:
+        return JsonResponse({'ok': False})
+    obj, _ = bookshelf.objects.get_or_create(user=request.user, book_id=book_id)
+    obj.rating = rating or None   # 0 clears the rating
+    obj.save(update_fields=['rating'])
+    return JsonResponse({'ok': True, 'rating': obj.rating})
 
 
 def hello(request):
