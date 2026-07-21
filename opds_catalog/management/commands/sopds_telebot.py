@@ -4,11 +4,13 @@ import sys
 import logging
 import re
 
+from asgiref.sync import sync_to_async
+
 from django.core.management.base import BaseCommand
 from django.conf import settings as main_settings
 from django.utils.html import strip_tags
 from django.db.models import Q
-from django.db import transaction, connection, connections
+from django.db import close_old_connections
 from django.contrib.auth.models import User
 from django.utils.translation import gettext as _
 from django.utils import translation
@@ -18,44 +20,54 @@ from opds_catalog import settings, dl
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 from sopds_web_backend.settings import HALF_PAGES_LINKS
 from constance import config
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, RegexHandler, CallbackQueryHandler, CallbackContext
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import InvalidToken
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler, filters,
+    CallbackQueryHandler, ContextTypes,
+)
 
 query_delimiter = "####"
 
-def cmdtrans(func):
-    def wrapper(self, update: Update, context: CallbackContext):
-        translation.activate(config.SOPDS_LANGUAGE)
-        result =  func(self, update, context)
-        translation.deactivate()
-        return result
 
+def cmdtrans(func):
+    """Activate the configured language for the duration of a handler."""
+    async def wrapper(self, update, context):
+        translation.activate(config.SOPDS_LANGUAGE)
+        try:
+            return await func(self, update, context)
+        finally:
+            translation.deactivate()
     return wrapper
 
 
 def CheckAuthDecorator(func):
-    def wrapper(self, update: Update, context: CallbackContext):
+    """Restrict handlers to known active users when SOPDS_TELEBOT_AUTH is on."""
+    async def wrapper(self, update, context):
         if not config.SOPDS_TELEBOT_AUTH:
-            return func(self, update, context)
+            return await func(self, update, context)
 
-        if connection.connection and not connection.is_usable():
-            del(connections._connections.default)
+        message = update.message if update.message else update.callback_query.message
+        from_user = update.message.from_user if update.message else update.callback_query.from_user
+        username = from_user.username
 
-        query = update.message if update.message else update.callback_query.message
-        username = update.message.from_user.username if update.message else update.callback_query.from_user.username
-        users = User.objects.filter(username__iexact=username)
+        @sync_to_async
+        def _is_allowed():
+            close_old_connections()
+            users = User.objects.filter(username__iexact=username)
+            return bool(users and users[0].is_active)
 
-        if users and users[0].is_active:
-            return func(self, update, context)
+        if await _is_allowed():
+            return await func(self, update, context)
 
-        context.bot.sendMessage(chat_id=query.chat_id,
-                        text=_("Hello %s!\nUnfortunately you do not have access to information. Please contact the bot administrator.") % username)
+        await context.bot.send_message(
+            chat_id=message.chat_id,
+            text=_("Hello %s!\nUnfortunately you do not have access to information. Please contact the bot administrator.") % username)
         self.logger.info(_("Denied access for user: %s") % username)
-
         return
-
     return wrapper
+
 
 class Command(BaseCommand):
     help = 'SimpleOPDS Telegram Bot engine.'
@@ -64,35 +76,33 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('command', help='Use [ start | stop | restart ]')
-        parser.add_argument('--verbose',action='store_true', dest='verbose', default=False, help='Set verbosity level for SimpleOPDS telebot.')
-        parser.add_argument('--daemon',action='store_true', dest='daemonize', default=False, help='Daemonize server')
-        
+        parser.add_argument('--verbose', action='store_true', dest='verbose', default=False, help='Set verbosity level for SimpleOPDS telebot.')
+        parser.add_argument('--daemon', action='store_true', dest='daemonize', default=False, help='Daemonize server')
+
     def handle(self, *args, **options):
         self.pidfile = os.path.join(main_settings.BASE_DIR, config.SOPDS_TELEBOT_PID)
-        action = options['command']            
+        action = options['command']
         self.logger = logging.getLogger('')
         self.logger.setLevel(logging.DEBUG)
-        formatter=logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+        formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 
-        if settings.LOGLEVEL!=logging.NOTSET:
-            # Создаем обработчик для записи логов в файл
+        if settings.LOGLEVEL != logging.NOTSET:
             fh = logging.FileHandler(config.SOPDS_TELEBOT_LOG)
             fh.setLevel(settings.LOGLEVEL)
             fh.setFormatter(formatter)
             self.logger.addHandler(fh)
 
         if options['verbose']:
-            # Создадим обработчик для вывода логов на экран с максимальным уровнем вывода
             ch = logging.StreamHandler()
             ch.setLevel(logging.DEBUG)
             ch.setFormatter(formatter)
             self.logger.addHandler(ch)
-            
+
         if (options["daemonize"] and (action in ["start"])):
             if sys.platform == "win32":
                 self.stdout.write("On Windows platform Daemonize not working.")
-            else:         
-                daemonize()            
+            else:
+                daemonize()
 
         if action == "start":
             self.start()
@@ -105,22 +115,20 @@ class Command(BaseCommand):
 
     @cmdtrans
     @CheckAuthDecorator
-    def startCommand(self, update: Update, context: CallbackContext):
-        context.bot.sendMessage(chat_id=update.message.chat_id, text=_("%(subtitle)s\nHello %(username)s! To search for a book, enter part of her title or author:")%
-                                                             {'subtitle':settings.SUBTITLE,'username':update.message.from_user.username})
-        self.logger.info("Start talking with user: %s"%update.message.from_user)
-        return
+    async def startCommand(self, update, context):
+        await context.bot.send_message(
+            chat_id=update.message.chat_id,
+            text=_("%(subtitle)s\nHello %(username)s! To search for a book, enter part of her title or author:") %
+                 {'subtitle': settings.SUBTITLE, 'username': update.message.from_user.username})
+        self.logger.info("Start talking with user: %s" % update.message.from_user)
+
+    # --- synchronous ORM helpers (run in a worker thread via sync_to_async) ---
 
     def BookFilter(self, query):
-        if connection.connection and not connection.is_usable():
-            del(connections._connections.default)
-
         q_objects = Q()
         q_objects.add(Q(search_title__contains=query.upper()), Q.OR)
-        q_objects.add( Q(authors__search_full_name__contains=query.upper()), Q.OR)
-        books = Book.objects.filter(q_objects).order_by('search_title', '-docdate').distinct()
-
-        return books
+        q_objects.add(Q(authors__search_full_name__contains=query.upper()), Q.OR)
+        return Book.objects.filter(q_objects).order_by('search_title', '-docdate').distinct()
 
     def BookPager(self, books, page_num, query):
         books_count = books.count()
@@ -130,19 +138,16 @@ class Command(BaseCommand):
         prev_title = ''
         prev_authors_set = set()
 
-        # Начаинам анализ с последнего элемента на предидущей странице, чторбы он "вытянул" с этой страницы
-        # свои дубликаты если они есть
         summary_DOUBLES_HIDE = config.SOPDS_DOUBLES_HIDE
         start = op.d1_first_pos if ((op.d1_first_pos == 0) or (not summary_DOUBLES_HIDE)) else op.d1_first_pos - 1
         finish = op.d1_last_pos
 
         for row in books[start:finish + 1]:
-            p = {'doubles': 0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
-                 'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
-                 'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize // 1000, \
+            p = {'doubles': 0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path,
+                 'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation),
+                 'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize // 1000,
                  'authors': row.authors.values(), 'genres': row.genres.values(), 'series': row.series.values(),
-                 'ser_no': row.bseries_set.values('ser_no')
-                 }
+                 'ser_no': row.bseries_set.values('ser_no')}
             if summary_DOUBLES_HIDE:
                 title = p['title']
                 authors_set = {a['id'] for a in p['authors']}
@@ -155,7 +160,6 @@ class Command(BaseCommand):
             else:
                 items.append(p)
 
-        # "вытягиваем" дубликаты книг со следующей страницы и удаляем первый элемент который с предыдущей страницы и "вытягивал" дубликаты с текущей
         if summary_DOUBLES_HIDE:
             double_flag = True
             while ((finish + 1) < books_count) and double_flag:
@@ -171,248 +175,225 @@ class Command(BaseCommand):
         response = ''
         for b in items:
             authors = ', '.join([a['full_name'] for a in b['authors']])
-            doubles = _("(doubles:%s) ")%b['doubles'] if b['doubles'] else ''
-            response+='<b>%(title)s</b>\n%(author)s\n%(dbl)s/download%(link)s\n\n'%{'title':b['title'], 'author':authors,'link':b['id'], 'dbl':doubles}
+            doubles = _("(doubles:%s) ") % b['doubles'] if b['doubles'] else ''
+            response += '<b>%(title)s</b>\n%(author)s\n%(dbl)s/download%(link)s\n\n' % {'title': b['title'], 'author': authors, 'link': b['id'], 'dbl': doubles}
 
-        #fix for rare empty response
+        # fix for rare empty response
         if not response:
-            response = self.BookPager(books, page_num -1, query)['message']
+            response = self.BookPager(books, page_num - 1, query)['message']
             op.number = page_num - 1
             op.next_page_number = op.number
             op.num_pages = op.number
 
-        buttons = [InlineKeyboardButton('1 <<', callback_data='%s%s%s'%(query,query_delimiter,1)),
-                   InlineKeyboardButton('%s <'%op.previous_page_number , callback_data='%s%s%s'%(query,query_delimiter,op.previous_page_number)),
-                   InlineKeyboardButton('[ %s ]'%op.number , callback_data='%s%s%s'%(query,query_delimiter,'current')),
-                   InlineKeyboardButton('> %s'%op.next_page_number , callback_data='%s%s%s'%(query,query_delimiter,op.next_page_number)),
-                   InlineKeyboardButton('>> %s'%op.num_pages, callback_data='%s%s%s'%(query,query_delimiter,op.num_pages))]
+        buttons = [InlineKeyboardButton('1 <<', callback_data='%s%s%s' % (query, query_delimiter, 1)),
+                   InlineKeyboardButton('%s <' % op.previous_page_number, callback_data='%s%s%s' % (query, query_delimiter, op.previous_page_number)),
+                   InlineKeyboardButton('[ %s ]' % op.number, callback_data='%s%s%s' % (query, query_delimiter, 'current')),
+                   InlineKeyboardButton('> %s' % op.next_page_number, callback_data='%s%s%s' % (query, query_delimiter, op.next_page_number)),
+                   InlineKeyboardButton('>> %s' % op.num_pages, callback_data='%s%s%s' % (query, query_delimiter, op.num_pages))]
 
-        markup = InlineKeyboardMarkup([buttons]) if op.num_pages>1 else None
+        markup = InlineKeyboardMarkup([buttons]) if op.num_pages > 1 else None
 
-        return {'message':response, 'buttons':markup}
+        return {'message': response, 'buttons': markup}
+
+    def _search(self, query, page_num):
+        """Filter + paginate. Returns {'count': 0} or {'count', 'message', 'buttons'}."""
+        close_old_connections()
+        translation.activate(config.SOPDS_LANGUAGE)
+        try:
+            books = self.BookFilter(query)
+            count = books.count()
+            if count == 0:
+                return {'count': 0}
+            data = self.BookPager(books, page_num, query)
+            return {'count': count, 'message': data['message'], 'buttons': data['buttons']}
+        finally:
+            translation.deactivate()
+
+    def _download_payload(self, text):
+        """Build the download-options message for a /downloadNNN link, or None."""
+        close_old_connections()
+        translation.activate(config.SOPDS_LANGUAGE)
+        try:
+            ids = re.findall(r'\d+$', text)
+            if len(ids) != 1:
+                return None
+            try:
+                book = Book.objects.get(id=int(ids[0]))
+            except Book.DoesNotExist:
+                return None
+
+            authors = ', '.join([a['full_name'] for a in book.authors.values()])
+            response = ('<b>%(title)s</b>\n%(author)s\n<b>' + _("Annotation:") + '</b>%(annotation)s\n') % {'title': book.title, 'author': authors, 'annotation': book.annotation}
+
+            buttons = [InlineKeyboardButton(book.format.upper(), callback_data='/getfileorig%s' % book.id)]
+            if book.format not in settings.NOZIP_FORMATS:
+                buttons += [InlineKeyboardButton(book.format.upper() + '.ZIP', callback_data='/getfilezip%s' % book.id)]
+            if (config.SOPDS_FB2TOEPUB != "") and (book.format == 'fb2'):
+                buttons += [InlineKeyboardButton('EPUB', callback_data='/getfileepub%s' % book.id)]
+            if (config.SOPDS_FB2TOMOBI != "") and (book.format == 'fb2'):
+                buttons += [InlineKeyboardButton('MOBI', callback_data='/getfilemobi%s' % book.id)]
+
+            return {'message': response, 'buttons': InlineKeyboardMarkup([buttons])}
+        finally:
+            translation.deactivate()
+
+    def _file_payload(self, data):
+        """Resolve a /getfile* callback to (document, filename), or None."""
+        close_old_connections()
+        ids = re.findall(r'\d+$', data)
+        if len(ids) != 1:
+            return None
+        try:
+            book = Book.objects.get(id=int(ids[0]))
+        except Book.DoesNotExist:
+            return None
+
+        filename = dl.getFileName(book)
+        document = None
+        if re.match(r'/getfileorig', data):
+            document = dl.getFileData(book)
+        elif re.match(r'/getfilezip', data):
+            document = dl.getFileDataZip(book)
+            filename = filename + '.zip'
+        elif re.match(r'/getfileepub', data):
+            document = dl.getFileDataEpub(book)
+            filename = filename.replace('.fb2', '.epub')
+        elif re.match(r'/getfilemobi', data):
+            document = dl.getFileDataMobi(book)
+            filename = filename.replace('.fb2', '.mobi')
+
+        if not document:
+            return None
+        return document, filename
+
+    # --- async handlers -----------------------------------------------------
 
     @cmdtrans
     @CheckAuthDecorator
-    def getBooks(self, update: Update, context: CallbackContext):
-        query=update.message.text
+    async def getBooks(self, update, context):
+        query = update.message.text
+        chat_id = update.message.chat_id
         self.logger.info("Got message from user %s: %s" % (update.message.from_user.username, query))
 
         if len(query) < 3:
-            response = _("Too short for search, please try again.")
-        else:
-            response = _("I'm searching for the book: %s") % (query)
-
-        context.bot.send_message(chat_id=update.message.chat_id, text=response)
-        self.logger.info("Send message to user %s: %s" % (update.message.from_user.username,response))
-
-        if len(query) < 3:
+            await context.bot.send_message(chat_id=chat_id, text=_("Too short for search, please try again."))
             return
 
-        books = self.BookFilter(query)
-        books_count = books.count()
+        await context.bot.send_message(chat_id=chat_id, text=_("I'm searching for the book: %s") % query)
 
-        if books_count == 0:
-            response = _("No results were found for your query, please try again.")
-            context.bot.send_message(chat_id=update.message.chat_id, text=response)
-            self.logger.info("Send message to user %s: %s" % (update.message.from_user.username,response))
+        data = await sync_to_async(self._search)(query, 1)
+        if data['count'] == 0:
+            await context.bot.send_message(chat_id=chat_id, text=_("No results were found for your query, please try again."))
             return
 
-        response = _("Found %s books.\nI create list, after a few seconds, select the file to download:") % books_count
-        context.bot.send_message(chat_id=update.message.chat_id, text=response)
-        self.logger.info("Send message to user %s: %s" % (update.message.from_user.username, response))
+        await context.bot.send_message(chat_id=chat_id, text=_("Found %s books.\nI create list, after a few seconds, select the file to download:") % data['count'])
+        await context.bot.send_message(chat_id=chat_id, text=data['message'], parse_mode='HTML', reply_markup=data['buttons'])
 
-        response = self.BookPager(books, 1, query)
-        context.bot.send_message(chat_id=update.message.chat_id, text=response['message'], parse_mode='HTML', reply_markup=response['buttons'])
-
-    @cmdtrans
-    @CheckAuthDecorator
-    def getBooksPage(self, update: Update, context: CallbackContext):
+    async def getBooksPage(self, update, context):
         callback_query = update.callback_query
         query, page_num = callback_query.data.split(query_delimiter, maxsplit=1)
         if page_num == 'current':
             return
         try:
             page_num = int(page_num)
-        except:
+        except (TypeError, ValueError):
             page_num = 1
 
-        books = self.BookFilter(query)
-        response = self.BookPager(books, page_num, query)
-        context.bot.edit_message_text(chat_id=callback_query.message.chat_id, message_id=callback_query.message.message_id, text=response['message'], parse_mode='HTML', reply_markup=response['buttons'])
-        return
+        data = await sync_to_async(self._search)(query, page_num)
+        if data['count'] == 0:
+            return
+        await context.bot.edit_message_text(
+            chat_id=callback_query.message.chat_id, message_id=callback_query.message.message_id,
+            text=data['message'], parse_mode='HTML', reply_markup=data['buttons'])
 
     @cmdtrans
     @CheckAuthDecorator
-    def downloadBooks(self, update: Update, context: CallbackContext):
-        book_id_set=re.findall(r'\d+$',update.message.text)
-        if len(book_id_set)==1:
-            try:
-                book_id=int(book_id_set[0])
-                book=Book.objects.get(id=book_id)
-            except:
-                book_id = None
-                book=None
-        else:
-            book_id=None
-            book=None
-
-        if book==None:
-            response = _("The book on the link you specified is not found, try to repeat the book search first.")
-            context.bot.sendMessage(chat_id=update.message.chat_id, text=response, parse_mode='HTML')
-            self.logger.info("Not find download links: %s" % response)
+    async def downloadBooks(self, update, context):
+        payload = await sync_to_async(self._download_payload)(update.message.text)
+        if payload is None:
+            await context.bot.send_message(
+                chat_id=update.message.chat_id,
+                text=_("The book on the link you specified is not found, try to repeat the book search first."),
+                parse_mode='HTML')
+            self.logger.info("Not find download links.")
             return
-
-        authors = ', '.join([a['full_name'] for a in book.authors.values()])
-        response = ('<b>%(title)s</b>\n%(author)s\n<b>'+_("Annotation:")+'</b>%(annotation)s\n') % {'title': book.title, 'author': authors, 'annotation':book.annotation}
-
-        buttons = [InlineKeyboardButton(book.format.upper(), callback_data='/getfileorig%s'%book_id)]
-        if not book.format in settings.NOZIP_FORMATS:
-            buttons += [InlineKeyboardButton(book.format.upper()+'.ZIP', callback_data='/getfilezip%s'%book_id)]
-        if (config.SOPDS_FB2TOEPUB != "") and (book.format == 'fb2'):
-            buttons += [InlineKeyboardButton('EPUB', callback_data='/getfileepub%s'%book_id)]
-        if (config.SOPDS_FB2TOMOBI != "") and (book.format == 'fb2'):
-            buttons += [InlineKeyboardButton('MOBI', callback_data='/getfilemobi%s'%book_id)]
-
-        markup = InlineKeyboardMarkup([buttons])
-        context.bot.sendMessage(chat_id=update.message.chat_id, text=response, parse_mode='HTML', reply_markup=markup)
+        await context.bot.send_message(chat_id=update.message.chat_id, text=payload['message'], parse_mode='HTML', reply_markup=payload['buttons'])
         self.logger.info("Send download buttons.")
-        return
 
-    @cmdtrans
-    @CheckAuthDecorator
-    def getBookFile(self, update: Update, context: CallbackContext):
+    async def getBookFile(self, update, context):
         callback_query = update.callback_query
-        query = callback_query.data
-        book_id_set=re.findall(r'\d+$',query)
-        if len(book_id_set)==1:
-            try:
-                book_id=int(book_id_set[0])
-                book=Book.objects.get(id=book_id)
-            except:
-                book=None
-        else:
-            book_id=None
-            book=None
-
-        if book==None:
-            response = _("The book on the link you specified is not found, try to repeat the book search first.")
-            context.bot.sendMessage(chat_id=callback_query.message.chat_id, text=response, parse_mode='HTML')
-            self.logger.info("Not find download links: %s" % response)
+        result = await sync_to_async(self._file_payload)(callback_query.data)
+        if result is None:
+            await context.bot.send_message(
+                chat_id=callback_query.message.chat_id,
+                text=_("There was a technical error, please contact the Bot administrator."),
+                parse_mode='HTML')
+            self.logger.info("Book get error.")
             return
-
-        filename = dl.getFileName(book)
-        document = None
-
-        if re.match(r'/getfileorig',query):
-            document = dl.getFileData(book)
-            #document = config.SOPDS_SITE_ROOT + reverse("opds_catalog:download",kwargs={"book_id": book.id, "zip_flag": 0})
-
-        if re.match(r'/getfilezip',query):
-            document = dl.getFileDataZip(book)
-            #document = config.SOPDS_SITE_ROOT + reverse("opds_catalog:download", kwargs={"book_id": book.id, "zip_flag": 1})
-            filename = filename + '.zip'
-
-        if re.match(r'/getfileepub',query):
-            document = dl.getFileDataEpub(book)
-            #document = config.SOPDS_SITE_ROOT+reverse("opds_catalog:convert",kwargs={"book_id": book.id, "convert_type": "epub"}))]
-            filename = filename.replace('.fb2', '.epub')
-
-        if re.match(r'/getfilemobi',query):
-            document = dl.getFileDataMobi(book)
-            #document = config.SOPDS_SITE_ROOT+reverse("opds_catalog:convert",kwargs={"book_id": book.id, "convert_type": "mobi"}))]
-            filename = filename.replace('.fb2', '.mobi')
-
-        if document:
-            context.bot.send_document(chat_id=callback_query.message.chat_id,document=document,filename=filename)
-            document.close()
-            self.logger.info("Send file: %s" % filename)
-        else:
-            response = _("There was a technical error, please contact the Bot administrator.")
-            context.bot.sendMessage(chat_id=callback_query.message.chat_id, text=response, parse_mode='HTML')
-            self.logger.info("Book get error: %s" % response)
-            return
-
-        return
+        document, filename = result
+        await context.bot.send_document(chat_id=callback_query.message.chat_id, document=document, filename=filename)
+        document.close()
+        self.logger.info("Send file: %s" % filename)
 
     @cmdtrans
     @CheckAuthDecorator
-    def botCallback(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-
-        if re.match(r'/getfile', query.data):
-            return self.getBookFile(update, context)
-        else:
-            return self.getBooksPage(update, context)
+    async def botCallback(self, update, context):
+        if re.match(r'/getfile', update.callback_query.data):
+            return await self.getBookFile(update, context)
+        return await self.getBooksPage(update, context)
 
     def start(self):
         writepid(self.pidfile)
         quit_command = 'CTRL-BREAK' if sys.platform == 'win32' else 'CONTROL-C'
-        self.stdout.write("Quit the sopds_telebot with %s.\n"%quit_command)
+        self.stdout.write("Quit the sopds_telebot with %s.\n" % quit_command)
         try:
-            updater = Updater(token=config.SOPDS_TELEBOT_API_TOKEN)
-            start_command_handler = CommandHandler('start', self.startCommand)
-            getBook_handler = MessageHandler(Filters.text, self.getBooks)
-	    #fix deprecated RegexHandler See https://git.io/fxJuV for more info
-            download_handler = MessageHandler(Filters.regex('^/download\d+$'),self.downloadBooks)
+            application = Application.builder().token(config.SOPDS_TELEBOT_API_TOKEN).build()
+            application.add_handler(CommandHandler('start', self.startCommand))
+            # /downloadNNN is matched before free-text book queries.
+            application.add_handler(MessageHandler(filters.Regex(r'^/download\d+$'), self.downloadBooks))
+            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.getBooks))
+            application.add_handler(CallbackQueryHandler(self.botCallback))
 
-            updater.dispatcher.add_handler(start_command_handler)
-	    #change order of handlers, to handle download(regexp) before common text(book name)
-            updater.dispatcher.add_handler(download_handler)
-            updater.dispatcher.add_handler(getBook_handler)
-            updater.dispatcher.add_handler(CallbackQueryHandler(self.botCallback))
-
-            updater.start_polling(drop_pending_updates=True)
-            updater.idle()
+            application.run_polling(drop_pending_updates=True)
         except InvalidToken:
             self.stdout.write('Invalid telegram token.\nSet correct token for telegram API by command:\n python3 manage.py sopds_util setconf SOPDS_TELEBOT_API_TOKEN "<token>"')
             self.logger.error('Invalid telegram token.')
-
         except (KeyboardInterrupt, SystemExit):
-            pass            
-    
+            pass
+
     def stop(self, pid):
         try:
             os.kill(int(pid), signal.SIGTERM)
         except OSError as e:
-            self.stdout.write("Error stopping sopds_telebot: %s"%str(e))
-    
+            self.stdout.write("Error stopping sopds_telebot: %s" % str(e))
+
     def restart(self, pid):
         self.stop(pid)
         self.start()
 
+
 def writepid(pid_file):
-    """
-    Write the process ID to disk.
-    """
+    """Write the process ID to disk."""
     fp = open(pid_file, "w")
     fp.write(str(os.getpid()))
     fp.close()
-    
+
+
 def daemonize():
-    """
-    Detach from the terminal and continue as a daemon.
-    """
+    """Detach from the terminal and continue as a daemon."""
     # swiped from twisted/scripts/twistd.py
-    # See http://www.erlenstar.demon.co.uk/unix/faq_toc.html#TOC16
-    if os.fork():   # launch child and...
-        os._exit(0) # kill off parent
+    if os.fork():
+        os._exit(0)
     os.setsid()
-    if os.fork():   # launch child and...
-        os._exit(0) # kill off parent again.
+    if os.fork():
+        os._exit(0)
     os.umask(0)
 
     std_in = open("/dev/null", 'r')
     std_out = open(config.SOPDS_TELEBOT_LOG, 'a+')
     os.dup2(std_in.fileno(), sys.stdin.fileno())
     os.dup2(std_out.fileno(), sys.stdout.fileno())
-    os.dup2(std_out.fileno(), sys.stderr.fileno())    
-    
+    os.dup2(std_out.fileno(), sys.stderr.fileno())
+
     os.close(std_in.fileno())
     os.close(std_out.fileno())
-
-
-    
-
-        
- 
-
