@@ -39,8 +39,5 @@ jobs:
 
       - run: pip install ruff
 
-      # Non-blocking for now: reports ruff findings as PR annotations without
-      # failing the pipeline, so the legacy code can be cleaned up gradually.
       - name: ruff
         run: ruff check --output-format=github .
-        continue-on-error: true

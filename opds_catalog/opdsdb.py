@@ -7,9 +7,9 @@ from django.db.models import Q
 from django.utils.translation import gettext as _ , gettext_noop as _noop
 from django.db import transaction, connection
 
-from opds_catalog.models import Book, Catalog, Author, Genre, Series, bseries, bauthor, bgenre, bookshelf, Counter, LangCodes
+from opds_catalog.models import Book, Catalog, Author, Genre, Series, bseries, bauthor, bgenre, LangCodes
 from opds_catalog.models import SIZE_BOOK_FILENAME, SIZE_BOOK_PATH, SIZE_BOOK_FORMAT, SIZE_BOOK_DOCDATE, SIZE_BOOK_LANG, SIZE_BOOK_TITLE, SIZE_BOOK_ANNOTATION
-from opds_catalog.models import SIZE_CAT_CATNAME, SIZE_CAT_PATH, SIZE_AUTHOR_NAME, SIZE_GENRE, SIZE_GENRE_SECTION, SIZE_GENRE_SUBSECTION, SIZE_SERIES
+from opds_catalog.models import SIZE_CAT_CATNAME, SIZE_CAT_PATH, SIZE_AUTHOR_NAME, SIZE_GENRE, SIZE_GENRE_SUBSECTION, SIZE_SERIES
 
 
 ##########################################################################

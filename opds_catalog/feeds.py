@@ -8,7 +8,7 @@ from django.http import Http404
 from django.db.models import Count, Min
 from django.utils.html import strip_tags
 
-from opds_catalog.models import Book, Catalog, Author, Genre, Series, bookshelf, Counter, lang_menu
+from opds_catalog.models import Book, Catalog, Author, Genre, Series, bookshelf, Counter
 from opds_catalog import models
 from opds_catalog import settings
 from opds_catalog.middleware import BasicAuthMiddleware

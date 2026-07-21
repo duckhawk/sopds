@@ -65,7 +65,7 @@ def detect_mime(file, original_filename):
                         with zip_file.open('mimetype') as mimetype_file:
                             if mimetype_file.read(30).decode().rstrip('\n\r') == Mimetype.EPUB:
                                 return Mimetype.EPUB
-                    except Exception as e:
+                    except Exception:
                         pass
         elif mime == Mimetype.OCTET_STREAM:
             mobiflag =  file.read(68)
