@@ -347,7 +347,9 @@ class Command(BaseCommand):
         quit_command = 'CTRL-BREAK' if sys.platform == 'win32' else 'CONTROL-C'
         self.stdout.write("Quit the sopds_telebot with %s.\n" % quit_command)
         try:
-            application = Application.builder().token(config.SOPDS_TELEBOT_API_TOKEN).build()
+            # The bot does not use PTB's JobQueue; disabling it avoids spinning
+            # up an unused APScheduler event loop.
+            application = Application.builder().token(config.SOPDS_TELEBOT_API_TOKEN).job_queue(None).build()
             application.add_handler(CommandHandler('start', self.startCommand))
             # /downloadNNN is matched before free-text book queries.
             application.add_handler(MessageHandler(filters.Regex(r'^/download\d+$'), self.downloadBooks))
