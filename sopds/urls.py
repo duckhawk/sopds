@@ -18,9 +18,13 @@ from django.contrib import admin
 from django.views.generic import RedirectView
 from django.urls import reverse_lazy
 
+from sopds import health
+
 # from django.contrib.auth import logout
 
 urlpatterns = [
+    re_path(r'^healthz/?$', health.healthz),
+    re_path(r'^readyz/?$', health.readyz),
     re_path(r'^opds/', include('opds_catalog.urls', namespace='opds')),
     re_path(r'^web/', include('sopds_web_backend.urls', namespace='web')),
     re_path(r'^admin/', admin.site.urls),

@@ -49,8 +49,15 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',     
     'constance.backends.database',
     'constance',
-    'raven.contrib.django.raven_compat',
 ]
+
+# Error tracking via Sentry (replaces the unmaintained raven). Provide the DSN
+# through SENTRY_DSN; empty disables it.
+SENTRY_DSN = os.getenv('SENTRY_DSN', '')
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[DjangoIntegration()], send_default_pii=False)
 
 # NOTE: Full-page caching (UpdateCacheMiddleware + FetchFromCacheMiddleware) is
 # intentionally NOT enabled. Every page embeds per-user content (bookshelf,
