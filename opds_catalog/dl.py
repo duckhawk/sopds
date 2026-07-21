@@ -492,7 +492,7 @@ def ReadFB2(request, book_id):
             fo=codecs.open(file_path, "rb")
         except FileNotFoundError:
             raise Http404
-        s=fo.read()
+        # NB: do not read fo here — ET.parse(fo) below needs it at position 0.
     elif book.cat_type in [opdsdb.CAT_ZIP, opdsdb.CAT_INP]:
         try:
             fz=codecs.open(full_path, "rb")
