@@ -24,7 +24,7 @@ from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
 
 from sopds_web_backend.settings import HALF_PAGES_LINKS
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, Http404
 
 
 def theme_css(user):
@@ -189,7 +189,10 @@ def SearchBooksView(request):
                 
         # Поиск дубликатов для книги            
         elif searchtype == 'd':
-            book_id = int(searchterms)
+            try:
+                book_id = int(searchterms)
+            except (TypeError, ValueError):
+                raise Http404
             mbook = get_object_or_404(Book, id=book_id)
             books = Book.objects.filter(title=mbook.title, authors__in=mbook.authors.all()).exclude(id=book_id).distinct().order_by('-docdate')
             args['breadcrumbs'] = [_('Books'),_('Doubles for book'),mbook.title]
@@ -597,7 +600,10 @@ def GenresView(request):
     args = {}
 
     if request.GET:
-        section_id = int(request.GET.get('section', '0'))  
+        try:
+            section_id = int(request.GET.get('section', '0'))
+        except (TypeError, ValueError):
+            raise Http404
     else:
         section_id = 0
         
