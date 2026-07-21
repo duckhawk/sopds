@@ -4,22 +4,30 @@
   <div class="show-for-medium medium-4 large-3 column" style="padding:0;"><a href="{% url "web:main" %}"><img src="{% static "images/sopds_logo.png" %}" alt="{{ app_title }}"></a></div>
 
   <div class="small-12 medium-8 large-9 column" style="padding:0;">
-  <form method="get" action="{% url "web:searchbooks" %}" id="searchform" data-abide>
+  <form method="get" action="{% url "web:searchbooks" %}" id="searchform" data-abide style="position:relative;">
   {% csrf_token %}
- 
-    <div class="input-group">  
-		<input class="input-group-field" type="search" name="searchterms" placeholder="Search" id="main_searchbox" data-validator="check_search" required>
+
+    <div class="input-group">
+		<input class="input-group-field" type="search" name="searchterms" placeholder="Search" id="main_searchbox"
+		       data-validator="check_search" required autocomplete="off"
+		       hx-post="{% url 'web:suggest' %}"
+		       hx-trigger="keyup changed delay:300ms, search"
+		       hx-target="#search-suggestions"
+		       hx-include="closest form">
 
 		<div class="input-group-button">
-		      <button class="button" type="submit" data-close="search-dropdown" name="submit">{% trans "Search" %}</button>	   
-		</div>   
-		
+		      <button class="button" type="submit" data-close="search-dropdown" name="submit">{% trans "Search" %}</button>
+		</div>
+
 		<div class="input-group-button">
-		      <a class="dropdown button arrow-only float-right" data-toggle="search-dropdown"></a>    
-		</div> 	
-		<input type="hidden" name="page" value="0">		
+		      <a class="dropdown button arrow-only float-right" data-toggle="search-dropdown"></a>
+		</div>
+		<input type="hidden" name="page" value="0">
+		<input type="hidden" name="suggesttype" id="suggesttype" value="title">
 	</div>
-			
+
+	<div id="search-suggestions"></div>
+
 	<div class="dropdown-pane bottom" id="search-dropdown" data-dropdown>
 	  <div class="row">
 	  <fieldset class="large-12 columns">
@@ -29,19 +37,36 @@
 	    <input type="radio" name="searchtype" value="m" id="series" onClick="SetSearch()" {% if searchobject == "series" %}checked{%endif%}><label for="series">{% trans "Series" %}</label>
 	  </fieldset>
 	  </div>
-	</div>	
-	 		    
+	</div>
+
   </form>
-  
+
   </div>
 
-  <script>    	
+  <style>
+    #search-suggestions { position:absolute; left:0; right:0; z-index:1000; }
+    #search-suggestions .search-suggestions { list-style:none; margin:0; padding:0;
+        background:#fff; color:#0a0a0a; border:1px solid #cacaca;
+        border-top:none; box-shadow:0 4px 8px rgba(0,0,0,.15); max-height:60vh; overflow-y:auto; }
+    #search-suggestions .search-suggestions li { margin:0; }
+    #search-suggestions .search-suggestions li a { display:block; padding:.4rem .75rem; color:#0a0a0a;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #search-suggestions .search-suggestions li a:hover { background:#e6e6e6; }
+  </style>
+
+  <script>
 	function SetSearch() {
 	         var searchtype = $("input[name='searchtype']:radio:checked").attr("id");
 	         $('#main_searchbox').attr( "placeholder","Search by "+ searchtype);
+	         $('#suggesttype').val(searchtype);
 	         if (searchtype == "title") $('#searchform').attr( "action","{% url "web:searchbooks" %}");
 	         if (searchtype == "author") $('#searchform').attr( "action","{% url "web:searchauthors" %}");
-	         if (searchtype == "series") $('#searchform').attr( "action","{% url "web:searchseries" %}");	
-	         $('#search-dropdown').foundation('close');         
-	}	   
+	         if (searchtype == "series") $('#searchform').attr( "action","{% url "web:searchseries" %}");
+	         $('#search-dropdown').foundation('close');
+	         $('#search-suggestions').empty();
+	}
+	// Dismiss the suggestions dropdown when clicking outside the search form.
+	$(document).on('click', function(e) {
+	         if (!$(e.target).closest('#searchform').length) $('#search-suggestions').empty();
+	});
   </script>

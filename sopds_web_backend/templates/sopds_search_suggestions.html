@@ -1,0 +1,8 @@
+{% load i18n %}
+{% if suggestions %}
+<ul class="search-suggestions">
+  {% for s in suggestions %}
+    <li><a href="{{ s.url }}">{{ s.label }}</a></li>
+  {% endfor %}
+</ul>
+{% endif %}
