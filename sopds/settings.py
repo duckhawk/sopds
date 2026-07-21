@@ -181,7 +181,6 @@ LOCALE_PATHS = (
 
 TIME_ZONE = 'Europe/Moscow'
 USE_I18N = True
-USE_L10N = True
 USE_TZ = True
 
 # Cache backend. "CACHE_BACKEND" was a Django <1.3 setting and is ignored by
