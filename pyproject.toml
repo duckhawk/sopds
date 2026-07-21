@@ -1,0 +1,23 @@
+# Tool configuration only. Packaging/runtime deps stay in requirements*.txt.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+# Vendored / generated code kept verbatim — not ours to lint.
+extend-exclude = ["constance", "convert", "static", "*/migrations/*"]
+
+[tool.ruff.lint]
+# Conservative baseline: syntax errors (E9) + pyflakes (F) catch real problems
+# (unused imports, undefined names) without style noise. Style/isort/bugbear
+# rules can be enabled incrementally as the legacy code is cleaned up.
+select = ["E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Re-exports in package inits.
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.12"
+# Lenient by design: large untyped legacy codebase. Tighten module by module.
+ignore_missing_imports = true
+exclude = "(^|/)(constance|convert|static)/|/migrations/"

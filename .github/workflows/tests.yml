@@ -27,3 +27,20 @@ jobs:
           pytest
           --cov=opds_catalog --cov=sopds_web_backend --cov=book_tools
           --cov-report=term-missing
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install ruff
+
+      # Non-blocking for now: reports ruff findings as PR annotations without
+      # failing the pipeline, so the legacy code can be cleaned up gradually.
+      - name: ruff
+        run: ruff check --output-format=github .
+        continue-on-error: true
