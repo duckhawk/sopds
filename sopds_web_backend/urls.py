@@ -8,6 +8,7 @@ urlpatterns = [
     re_path(r'^search/books/$',views.SearchBooksView, name='searchbooks'),
     re_path(r'^search/authors/$',views.SearchAuthorsView, name='searchauthors'),
     re_path(r'^search/series/$',views.SearchSeriesView, name='searchseries'),
+    re_path(r'^search/suggest/$',views.SearchSuggestView, name='suggest'),
     re_path(r'^catalog/$',views.CatalogsView, name='catalog'),
     re_path(r'^book/$',views.BooksView, name='book'),
     re_path(r'^book/read/(?P<book_id>[0-9]+)/$',views.BookReaderView, name='read'),

@@ -711,6 +711,33 @@ def hello(request):
     return render(request, 'sopds_hello.html', args)
 
 
+@sopds_login(url='web:login')
+def SearchSuggestView(request):
+    """Live search suggestions for the search box (htmx endpoint).
+
+    Returns an HTML fragment with up to 10 matches for the current query,
+    scoped to the selected search type (title/author/series). Each suggestion
+    links to the corresponding search result. Behind @sopds_login so it honours
+    SOPDS_AUTH like the rest of the UI.
+    """
+    term = (request.POST.get('searchterms') or request.GET.get('searchterms') or '').strip()
+    suggesttype = request.POST.get('suggesttype') or request.GET.get('suggesttype') or 'title'
+    suggestions = []
+    if len(term) >= 2:
+        up = term.upper()
+        base = reverse('web:searchbooks')
+        if suggesttype == 'author':
+            for a in Author.objects.filter(search_full_name__contains=up).order_by('search_full_name')[:10]:
+                suggestions.append({'label': a.full_name, 'url': '%s?searchtype=a&searchterms=%d' % (base, a.id)})
+        elif suggesttype == 'series':
+            for s in Series.objects.filter(search_ser__contains=up).order_by('search_ser')[:10]:
+                suggestions.append({'label': s.ser, 'url': '%s?searchtype=s&searchterms=%d' % (base, s.id)})
+        else:
+            for b in Book.objects.filter(search_title__contains=up).order_by('search_title')[:10]:
+                suggestions.append({'label': b.title, 'url': '%s?searchtype=i&searchterms=%d' % (base, b.id)})
+    return render(request, 'sopds_search_suggestions.html', {'suggestions': suggestions})
+
+
 def LoginView(request):
     args = {}
     args['breadcrumbs'] = [_('Login')]
