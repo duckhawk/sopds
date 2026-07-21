@@ -4,6 +4,7 @@ from django.utils.feedgenerator import Atom1Feed, Enclosure, rfc3339_date
 from django.contrib.syndication.views import Feed
 from django.urls import reverse
 from django.shortcuts import render, get_object_or_404
+from django.http import Http404
 from django.db.models import Count, Min
 from django.utils.html import strip_tags
 
@@ -453,7 +454,10 @@ class SearchBooksFeed(AuthFeed):
                 books=Book.objects.filter(id=0)  
         # Поиск дубликатов для книги            
         elif searchtype == 'd':
-            book_id = int(searchterms)
+            try:
+                book_id = int(searchterms)
+            except (TypeError, ValueError):
+                raise Http404
             mbook = Book.objects.get(id=book_id)
             books = Book.objects.filter(title__iexact=mbook.title, authors__in=mbook.authors.all()).exclude(id=book_id).order_by('search_title','-docdate')
                     
