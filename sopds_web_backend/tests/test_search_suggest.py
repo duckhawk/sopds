@@ -61,10 +61,12 @@ def test_suggest_series(logged_client):
 
 
 @pytest.mark.django_db
-def test_suggest_too_short_is_empty(logged_client):
+@pytest.mark.parametrize("term", ["b", "bo"])
+def test_suggest_too_short_is_empty(logged_client, term):
+    """<3 chars returns nothing (the pg_trgm index needs a full trigram)."""
     _make_book("Book One")
     resp = logged_client.post(
-        reverse("web:suggest"), {"searchterms": "b", "suggesttype": "title"}
+        reverse("web:suggest"), {"searchterms": term, "suggesttype": "title"}
     )
     assert resp.status_code == 200
     assert "<li>" not in resp.content.decode()

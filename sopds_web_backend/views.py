@@ -17,7 +17,7 @@ from django.http import HttpResponseRedirect
 from opds_catalog import models
 from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalog, Genre, lang_menu, Theme
 from opds_catalog import settings
-from opds_catalog.utils import alphabet_menu
+from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from constance import config
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
@@ -251,9 +251,25 @@ def SearchBooksView(request):
             prefetch.append(Prefetch('bookshelf_set',
                                      queryset=bookshelf.objects.filter(user=request.user),
                                      to_attr='user_shelf'))
-        page_books = books.prefetch_related(*prefetch)
+        # For the title-substring search, fetch the page (plus a small lookahead
+        # for the doubles pass) via the pg_trgm-friendly fenced query instead of
+        # slicing an ORDER BY queryset, which makes PostgreSQL scan the btree
+        # row-by-row (very slow on large cyrillic catalogs).
+        lookahead_rows = None
+        if searchtype == 'm' and searchterms:
+            want = finish - start + 1
+            page_ids = contains_page_ids(
+                'opds_catalog_book', 'search_title', searchterms.upper(),
+                'search_title, docdate', 'search_title, docdate DESC',
+                want + 30, start)
+            by_id = {b.id: b for b in Book.objects.filter(id__in=page_ids).prefetch_related(*prefetch)}
+            fetched = [by_id[i] for i in page_ids if i in by_id]
+            page_rows = fetched[:want]
+            lookahead_rows = fetched[want:]
+        else:
+            page_rows = books.prefetch_related(*prefetch)[start:finish+1]
 
-        for row in page_books[start:finish+1]:
+        for row in page_rows:
             user_shelf = getattr(row, 'user_shelf', []) if config.SOPDS_AUTH else []
             p = {'doubles': 0,
                  'lang_code': row.lang_code,
@@ -292,12 +308,21 @@ def SearchBooksView(request):
         # "вытягиваем" дубликаты книг со следующей страницы и удаляем первый элемент который с предыдущей страницы и "вытягивал" дубликаты с текущей
         if summary_DOUBLES_HIDE:
             double_flag = True
-            while ((finish+1)<books_count) and double_flag:
-                finish += 1  
-                if books[finish].title.upper() == prev_title.upper() and {a['id'] for a in books[finish].authors.values()} == prev_authors_set:
-                    items[-1]['doubles'] += 1
-                else:
-                    double_flag = False   
+            if lookahead_rows is not None:
+                for nb in lookahead_rows:
+                    if not double_flag:
+                        break
+                    if nb.title.upper() == prev_title.upper() and {a.id for a in nb.authors.all()} == prev_authors_set:
+                        items[-1]['doubles'] += 1
+                    else:
+                        double_flag = False
+            else:
+                while ((finish+1)<books_count) and double_flag:
+                    finish += 1
+                    if books[finish].title.upper() == prev_title.upper() and {a['id'] for a in books[finish].authors.values()} == prev_authors_set:
+                        items[-1]['doubles'] += 1
+                    else:
+                        double_flag = False
             
             if op.d1_first_pos != 0:
                 items.pop(0)                                   
@@ -387,7 +412,14 @@ def SearchSeriesView(request):
         series_count = series.count()
         op = OPDS_Paginator(series_count, 0, page_num, config.SOPDS_MAXITEMS, HALF_PAGES_LINKS)        
         items = []
-        for row in series[op.d1_first_pos:op.d1_last_pos+1]:
+        if searchtype == 'm' and searchterms:
+            page_series = contains_page(Series.objects.annotate(count_book=Count('book')),
+                                        'opds_catalog_series', 'search_ser', searchterms.upper(),
+                                        'search_ser', 'search_ser',
+                                        op.d1_last_pos - op.d1_first_pos + 1, op.d1_first_pos)
+        else:
+            page_series = series[op.d1_first_pos:op.d1_last_pos+1]
+        for row in page_series:
             #p = {'id':row.id, 'ser':row.ser, 'lang_code': row.lang_code, 'book_count': Book.objects.filter(series=row).count()}
             p = {'id':row.id, 'ser':row.ser, 'lang_code': row.lang_code, 'book_count': row.count_book}
             items.append(p)                     
@@ -432,7 +464,13 @@ def SearchAuthorsView(request):
         op = OPDS_Paginator(authors_count, 0, page_num, config.SOPDS_MAXITEMS, HALF_PAGES_LINKS)        
         items = []
         
-        for row in authors[op.d1_first_pos:op.d1_last_pos+1]:
+        if searchtype == 'm' and searchterms:
+            page_authors = contains_page(Author.objects, 'opds_catalog_author', 'search_full_name',
+                                         searchterms.upper(), 'search_full_name', 'search_full_name',
+                                         op.d1_last_pos - op.d1_first_pos + 1, op.d1_first_pos)
+        else:
+            page_authors = authors[op.d1_first_pos:op.d1_last_pos+1]
+        for row in page_authors:
             p = {'id':row.id, 'full_name':row.full_name, 'lang_code': row.lang_code, 'book_count': Book.objects.filter(authors=row).count()}
             items.append(p)                     
             
@@ -746,17 +784,23 @@ def SearchSuggestView(request):
     term = (request.POST.get('searchterms') or request.GET.get('searchterms') or '').strip()
     suggesttype = request.POST.get('suggesttype') or request.GET.get('suggesttype') or 'title'
     suggestions = []
-    if len(term) >= 2:
+    # Require >=3 chars: the pg_trgm index needs a full trigram, and 2-char
+    # substrings match too much to be useful. No ORDER BY here on purpose — an
+    # `ORDER BY search_title` makes PostgreSQL drive the query off the plain
+    # btree index and filter LIKE '%..%' row-by-row (slow on large, cyrillic-
+    # heavy catalogs) instead of using the trigram index. Autocomplete does not
+    # need sorted output.
+    if len(term) >= 3:
         up = term.upper()
         base = reverse('web:searchbooks')
         if suggesttype == 'author':
-            for a in Author.objects.filter(search_full_name__contains=up).order_by('search_full_name')[:10]:
+            for a in Author.objects.filter(search_full_name__contains=up)[:10]:
                 suggestions.append({'label': a.full_name, 'url': '%s?searchtype=a&searchterms=%d' % (base, a.id)})
         elif suggesttype == 'series':
-            for s in Series.objects.filter(search_ser__contains=up).order_by('search_ser')[:10]:
+            for s in Series.objects.filter(search_ser__contains=up)[:10]:
                 suggestions.append({'label': s.ser, 'url': '%s?searchtype=s&searchterms=%d' % (base, s.id)})
         else:
-            for b in Book.objects.filter(search_title__contains=up).order_by('search_title')[:10]:
+            for b in Book.objects.filter(search_title__contains=up)[:10]:
                 suggestions.append({'label': b.title, 'url': '%s?searchtype=i&searchterms=%d' % (base, b.id)})
     return render(request, 'sopds_search_suggestions.html', {'suggestions': suggestions})
 
