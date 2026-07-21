@@ -262,7 +262,14 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_SERVER_PID', (os.path.join(BASE_DIR,'opds_catalog/tmp/sopds_server.pid'),_('Path to pidfile for sopds_server process'))),
     ('SOPDS_SCANNER_PID', (os.path.join(BASE_DIR,'opds_catalog/tmp/sopds_scanner.pid'),_('Path to pidfile for sopds_scanner process'))),
     ('SOPDS_TELEBOT_PID', (os.path.join(BASE_DIR, 'opds_catalog/tmp/sopds_telebot.pid'), _('Path to pidfile for sopds_telebot process'))),
-                      
+
+    ('SOPDS_OIDC_ENABLE', (False, _('Enable OIDC (Keycloak) login on the web login page'))),
+    ('SOPDS_OIDC_ISSUER', ('', _('OIDC issuer URL (Keycloak realm), e.g. https://keycloak.example.com/realms/library'))),
+    ('SOPDS_OIDC_CLIENT_ID', ('', _('OIDC client ID'))),
+    ('SOPDS_OIDC_CLIENT_SECRET', ('', _('OIDC client secret'))),
+    ('SOPDS_OIDC_SCOPES', ('openid email profile', _('OIDC scopes (space-separated)'))),
+    ('SOPDS_OIDC_BUTTON_TEXT', ('Log in with Keycloak', _('Text on the OIDC login button'))),
+
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -273,6 +280,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     '5. Telegramm Bot Options': ('SOPDS_TELEBOT_API_TOKEN','SOPDS_TELEBOT_AUTH','SOPDS_TELEBOT_MAXITEMS'),
     '6. Converters Options': ('SOPDS_FB2TOEPUB', 'SOPDS_FB2TOMOBI', 'SOPDS_TEMP_DIR'),
     '7. Log & PID Files': ('SOPDS_SERVER_LOG', 'SOPDS_SCANNER_LOG', 'SOPDS_TELEBOT_LOG','SOPDS_SERVER_PID','SOPDS_SCANNER_PID','SOPDS_TELEBOT_PID'),
+    '8. OIDC (Keycloak)': ('SOPDS_OIDC_ENABLE', 'SOPDS_OIDC_ISSUER', 'SOPDS_OIDC_CLIENT_ID', 'SOPDS_OIDC_CLIENT_SECRET', 'SOPDS_OIDC_SCOPES', 'SOPDS_OIDC_BUTTON_TEXT'),
 }
 
 

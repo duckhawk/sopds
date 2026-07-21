@@ -19,6 +19,7 @@ from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalo
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from constance import config
+from sopds_web_backend import oidc
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
 
@@ -62,6 +63,8 @@ def sopds_processor(request):
     args={}
     args['app_title'] = settings.TITLE
     args['sopds_auth'] = config.SOPDS_AUTH
+    args['oidc_enabled'] = oidc.oidc_enabled()
+    args['oidc_button_text'] = config.SOPDS_OIDC_BUTTON_TEXT
     args['sopds_version'] = settings.VERSION
     args['alphabet'] = config.SOPDS_ALPHABET_MENU
     args['splititems'] = config.SOPDS_SPLITITEMS
@@ -803,6 +806,42 @@ def SearchSuggestView(request):
             for b in Book.objects.filter(search_title__contains=up)[:10]:
                 suggestions.append({'label': b.title, 'url': '%s?searchtype=i&searchterms=%d' % (base, b.id)})
     return render(request, 'sopds_search_suggestions.html', {'suggestions': suggestions})
+
+
+def OIDCLoginView(request):
+    """Start the OIDC (Keycloak) login flow (Authlib handles state/nonce/PKCE)."""
+    if not oidc.oidc_enabled():
+        raise Http404
+    next_url = request.GET.get('next', reverse('web:main'))
+    if not url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
+        next_url = reverse('web:main')
+    request.session['oidc_next'] = next_url
+    redirect_uri = request.build_absolute_uri(reverse('web:oidc_callback'))
+    return oidc.get_client().authorize_redirect(request, redirect_uri)
+
+
+def OIDCCallbackView(request):
+    """OIDC redirect target: exchange the code, provision the user, log in."""
+    if not oidc.oidc_enabled():
+        raise Http404
+    client = oidc.get_client()
+    try:
+        token = client.authorize_access_token(request)
+    except Exception:
+        args = {'breadcrumbs': [_('Login')], 'css_file': 'css/sopds.css',
+                'system_message': {'text': _('OIDC authentication failed.'), 'type': 'alert'}}
+        return handler403(request, args)
+
+    userinfo = token.get('userinfo') or client.userinfo(token=token)
+    user = oidc.provision_user(userinfo)
+    if user is None:
+        args = {'breadcrumbs': [_('Login')], 'css_file': 'css/sopds.css',
+                'system_message': {'text': _('This account cannot sign in via OIDC.'), 'type': 'alert'}}
+        return handler403(request, args)
+
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    next_url = request.session.pop('oidc_next', None) or reverse('web:main')
+    return redirect(next_url)
 
 
 def LoginView(request):
