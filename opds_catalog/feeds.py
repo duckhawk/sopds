@@ -3,7 +3,7 @@ from django.utils.translation import gettext as _
 from django.utils.feedgenerator import Atom1Feed, Enclosure, rfc3339_date
 from django.contrib.syndication.views import Feed
 from django.urls import reverse
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.db.models import Count, Min
 from django.utils.html import strip_tags
 
@@ -1008,7 +1008,7 @@ class GenresFeed(AuthFeed):
         if section_id==0:
             dataset = Genre.objects.values('section').annotate(section_id=Min('id'), num_book=Count('book')).filter(num_book__gt=0).order_by('section')
         else:
-            section = Genre.objects.get(id=section_id).section
+            section = get_object_or_404(Genre, id=section_id).section
             dataset = Genre.objects.filter(section=section).annotate(num_book=Count('book')).filter(num_book__gt=0).values().order_by('subsection')       
         return dataset
 
