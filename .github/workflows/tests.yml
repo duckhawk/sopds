@@ -15,14 +15,15 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
+          cache-dependency-path: requirements-test.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+          pip install -r requirements-test.txt
 
       - name: Run test suite
-        run: pytest
+        run: >-
+          pytest
+          --cov=opds_catalog --cov=sopds_web_backend --cov=book_tools
+          --cov-report=term-missing

@@ -1,0 +1,15 @@
+# Minimal dependency set to run the test suite on sqlite (see pytest.ini).
+# Used by CI and for fast local test runs. Deliberately excludes
+# production-only / slow-to-build / optional packages that the tests never
+# import (uwsgi, psycopg2-binary, redis, sentry-sdk, mcp, python-telegram-bot);
+# the suite runs on sqlite. Keep the shared runtime pins aligned with
+# requirements.txt.
+Django==4.2.30
+Pillow==10.4.0
+lxml==6.1.1
+django-picklefield==3.2
+six==1.16.0
+
+pytest==9.1.1
+pytest-django==4.12.0
+pytest-cov==7.1.0
