@@ -1,11 +1,14 @@
-Django==4.2.30; python_version >= '3.4'
-Pillow==10.4.0
+Django==5.2.16
+Pillow==11.3.0
+# python-telegram-bot 13.14 hard-pins APScheduler==3.6.3 (and needs tzlocal<3,
+# six, urllib3<2, pkg_resources). Upgrading these requires rewriting the bot on
+# python-telegram-bot 21+, so they stay put until that is done separately.
 apscheduler==3.6.3
 # apscheduler 3.6.3 imports pkg_resources at load; Python 3.12 no longer
 # bundles setuptools, and setuptools>=81 dropped pkg_resources.
 setuptools==75.8.0
 tzlocal==2.1
-django-picklefield==3.2
+django-picklefield==3.4.0
 lxml==6.1.1
 python-telegram-bot==13.14
 # python-telegram-bot 13.14 vendors urllib3 1.x, whose six.moves shim fails
@@ -14,7 +17,7 @@ urllib3==1.26.20
 six==1.16.0
 psycopg2-binary==2.9.10
 # Used by django.core.cache.backends.redis.RedisCache when REDIS_URL is set.
-redis==5.0.8
+redis==5.2.1
 uwsgi==2.0.28
 sentry-sdk==2.19.2
 mcp==1.2.0; python_version >= '3.10'
