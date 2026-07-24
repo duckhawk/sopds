@@ -5,13 +5,21 @@ they change. Endpoints are discovered from the issuer's
 ``.well-known/openid-configuration`` (so only the issuer URL is configured, not
 each endpoint).
 
-Scope: the browser login flow only. OPDS feeds keep HTTP Basic auth (e-readers
-cannot do an interactive redirect). Django admin access stays with local
-accounts — OIDC provisions regular (non-staff) users, and login is refused for
-usernames that already belong to a staff/superuser account.
+Browser login uses the OIDC redirect flow. OPDS feeds (e-readers) can't do an
+interactive redirect, so they send HTTP Basic auth; authenticate_password()
+below validates those credentials against Keycloak via the Resource Owner
+Password Credentials grant (requires "Direct Access Grants" enabled on the
+Keycloak client; no MFA). Django admin access stays with local accounts —
+OIDC provisions regular (non-staff) users, and login is refused for usernames
+that already belong to a staff/superuser account.
 """
+import hashlib
+
+import requests
 from authlib.integrations.django_client import OAuth
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from constance import config
 
 _oauth = None
@@ -82,4 +90,69 @@ def provision_user(userinfo):
     if updates:
         user.save(update_fields=updates)
 
+    return user
+
+
+def _discovery():
+    """Fetch (and cache for an hour) the issuer's OIDC discovery document."""
+    issuer = config.SOPDS_OIDC_ISSUER.rstrip('/')
+    key = 'oidc:discovery:%s' % issuer
+    doc = cache.get(key)
+    if doc is None:
+        resp = requests.get('%s/.well-known/openid-configuration' % issuer, timeout=10)
+        resp.raise_for_status()
+        doc = resp.json()
+        cache.set(key, doc, 3600)
+    return doc
+
+
+def authenticate_password(username, password):
+    """Validate OPDS Basic-auth credentials against Keycloak (ROPC grant).
+
+    Returns the provisioned Django user, or None. A successful result is cached
+    briefly (keyed by a salted hash of the credentials, never the password
+    itself) so e-readers — which re-send Basic auth on every request — don't hit
+    Keycloak each time.
+    """
+    if not oidc_enabled() or not username or not password:
+        return None
+
+    cache_key = 'oidc:ropc:%s' % hashlib.sha256(
+        ('%s:%s:%s' % (username, password, settings.SECRET_KEY)).encode()).hexdigest()
+    cached_uid = cache.get(cache_key)
+    if cached_uid:
+        user = User.objects.filter(id=cached_uid, is_active=True).first()
+        if user and not (user.is_staff or user.is_superuser):
+            return user
+
+    try:
+        doc = _discovery()
+        data = {
+            'grant_type': 'password',
+            'client_id': config.SOPDS_OIDC_CLIENT_ID,
+            'username': username,
+            'password': password,
+            'scope': config.SOPDS_OIDC_SCOPES or 'openid email profile',
+        }
+        if config.SOPDS_OIDC_CLIENT_SECRET:
+            data['client_secret'] = config.SOPDS_OIDC_CLIENT_SECRET
+        resp = requests.post(doc['token_endpoint'], data=data, timeout=10)
+        if resp.status_code != 200:
+            return None
+        access_token = resp.json().get('access_token')
+        if not access_token:
+            return None
+        # Validate the token and get claims from the userinfo endpoint (returns
+        # 200 only for a valid token — the authoritative server-side check).
+        ur = requests.get(doc['userinfo_endpoint'],
+                          headers={'Authorization': 'Bearer %s' % access_token}, timeout=10)
+        if ur.status_code != 200:
+            return None
+        userinfo = ur.json()
+    except (requests.RequestException, KeyError, ValueError):
+        return None
+
+    user = provision_user(userinfo)
+    if user is not None:
+        cache.set(cache_key, user.id, 300)
     return user

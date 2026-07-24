@@ -46,9 +46,17 @@ class BasicAuthMiddleware(object):
         username, password = auth_data.split(':',1)            
 
         user = auth.authenticate(username=username, password=password)
+        if not (user and user.is_active):
+            # No local match: for OPDS clients (Basic auth only), validate the
+            # credentials against Keycloak via the ROPC grant so OIDC users can
+            # read feeds without a local password.
+            from sopds_web_backend import oidc
+            if oidc.oidc_enabled():
+                user = oidc.authenticate_password(username, password)
+
         if user and user.is_active:
             request.user = user
-            auth.login(request, user)
+            auth.login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             return request
 
         return self.unauthed()
