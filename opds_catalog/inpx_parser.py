@@ -10,6 +10,8 @@ import zipfile
 #from opds_catalog import settings
 from constance import config
 
+from opds_catalog.ziptools import open_zipfile
+
 sAuthor = 'AUTHOR'
 sGenre  = 'GENRE'
 sTitle  = 'TITLE'
@@ -108,7 +110,9 @@ class Inpx:
 
                 # Если нужно выполнить проверку книги в ZIP, а ее там не оказалось, то пропускаем вызов callback
                 if self.TEST_FILES:
-                    if not "%s.%s"%(meta_data[sFile],meta_data[sExt]) in zipfile.ZipFile(zip_file, "r").namelist():
+                    # open_zipfile decodes cp866 member names, so cyrillic book
+                    # filenames match instead of being wrongly skipped as absent.
+                    if not "%s.%s"%(meta_data[sFile],meta_data[sExt]) in open_zipfile(zip_file).namelist():
                         continue
 
                 self.append_callback(self.inpx_file, inp_name, meta_data)

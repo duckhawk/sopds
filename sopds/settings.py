@@ -77,6 +77,37 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# --- Security hardening ----------------------------------------------------
+# Behind a TLS-terminating ingress/proxy the pod is reached over plain HTTP but
+# the original scheme arrives in X-Forwarded-Proto; trust it so Django treats
+# such requests as secure (needed for correct secure-cookie handling).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# HTTPS hardening (secure cookies + HSTS) is enabled automatically whenever
+# DEBUG is off, and can be forced on/off with SOPDS_SECURE_SSL. It stays off in
+# dev/plain-HTTP so secure cookies don't lock you out of login.
+_secure_ssl_env = os.getenv('SOPDS_SECURE_SSL', '')
+SECURE_SSL = (not DEBUG) if _secure_ssl_env == '' else _secure_ssl_env.lower() in ('1', 'true', 'yes')
+
+SESSION_COOKIE_SECURE = SECURE_SSL
+CSRF_COOKIE_SECURE = SECURE_SSL
+# HSTS is only meaningful over HTTPS; default to one year when secure.
+SECURE_HSTS_SECONDS = 31536000 if SECURE_SSL else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_SSL
+SECURE_HSTS_PRELOAD = SECURE_SSL
+
+# HTTP->HTTPS redirect is left opt-in (SOPDS_SSL_REDIRECT): the ingress normally
+# handles it, and enabling it here would 301 plain-HTTP health probes.
+SECURE_SSL_REDIRECT = os.getenv('SOPDS_SSL_REDIRECT', '').lower() in ('1', 'true', 'yes')
+
+# Cookie and header defaults that are safe regardless of TLS. SameSite=Lax keeps
+# the OIDC login redirect working while blocking cross-site cookie sends.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
 ROOT_URLCONF = 'sopds.urls'
 
 TEMPLATES = [

@@ -35,3 +35,13 @@ def test_search_doubles_non_numeric_returns_404(logged_client):
 def test_opds_search_doubles_non_numeric_returns_404(logged_client):
     resp = logged_client.get("/opds/search/books/d/abc/")
     assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_search_by_id_missing_book_does_not_500(logged_client):
+    # searchtype='i' with a non-existent book id used to do books[0].title on an
+    # empty queryset -> IndexError -> HTTP 500. It must render normally instead.
+    resp = logged_client.get(
+        reverse("web:searchbooks"), {"searchtype": "i", "searchterms": "999999"}
+    )
+    assert resp.status_code == 200
