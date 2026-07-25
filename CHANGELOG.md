@@ -52,6 +52,9 @@ All notable changes to this project are documented here. The format is based on
 - A duplicate book/catalog row no longer aborts the whole scan: `findbook`
   and `findcat` return the first match instead of raising
   `MultipleObjectsReturned`.
+- The scanner takes a cross-process `flock` before scanning, so an overlapping
+  run (cron + manual) can no longer corrupt the `avail` sweep and delete live
+  books. `apscheduler` is now imported lazily (only for `start`).
 
 ### Security
 - Env-gated production security settings: `SESSION_COOKIE_SECURE`,

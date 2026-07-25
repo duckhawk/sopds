@@ -3,8 +3,10 @@ import signal
 import sys
 import logging
 
-from apscheduler.schedulers.blocking import BlockingScheduler
-
+try:
+    import fcntl
+except ImportError:   # Windows has no fcntl; locking is then a no-op.
+    fcntl = None
 
 from django.core.management.base import BaseCommand
 from django.db import transaction, connection, connections
@@ -65,21 +67,61 @@ class Command(BaseCommand):
             pid = open(self.pidfile, "r").read()
             self.restart(pid)            
 
+    def _acquire_lock(self):
+        """Take a cross-process exclusive lock (non-blocking) on <pidfile>.lock.
+
+        The in-process ``scan_is_active`` flag does not stop a second *process*
+        (e.g. a cron `start` overlapping a manual `scan`) from running the
+        avail 1->2->delete sweep concurrently and deleting live books. Returns
+        an open file object to keep held for the scan's duration, or None if
+        another process holds the lock. On platforms without fcntl, locking is
+        skipped (returns the file object so the scan still runs).
+        """
+        try:
+            fd = open(self.pidfile + '.lock', 'w')
+        except OSError:
+            return None
+        if fcntl is None:
+            return fd
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            fd.close()
+            return None
+        return fd
+
+    @staticmethod
+    def _release_lock(fd):
+        if fd is None:
+            return
+        try:
+            if fcntl is not None:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            fd.close()
+
     def scan(self):
         if self.scan_is_active:
             self.stdout.write('Scan process already active. Skip currend job.')
             return
-        
+
+        lock_fd = self._acquire_lock()
+        if lock_fd is None:
+            self.stdout.write('Another scan is already running (locked). Skip current job.')
+            return
+
         self.scan_is_active = True
-        
-        if connection.connection and not connection.is_usable():
-            del(connections._connections.default)
-                
-        scanner=opdsScanner(self.logger)
-        with transaction.atomic():
-            scanner.scan_all()
-        Counter.objects.update_known_counters()  
-        self.scan_is_active = False
+        try:
+            if connection.connection and not connection.is_usable():
+                del(connections._connections.default)
+
+            scanner=opdsScanner(self.logger)
+            with transaction.atomic():
+                scanner.scan_all()
+            Counter.objects.update_known_counters()
+        finally:
+            self.scan_is_active = False
+            self._release_lock(lock_fd)
         
     def update_shedule(self):
         self.SCAN_SHED_DAY = config.SOPDS_SCAN_SHED_DAY
@@ -104,6 +146,9 @@ class Command(BaseCommand):
             self.sched.add_job(self.scan, id='scan_directly')
                        
     def start(self):
+        # Imported lazily: apscheduler is only needed to run the scheduler, so
+        # the module (and its lock helpers) can be imported without it present.
+        from apscheduler.schedulers.blocking import BlockingScheduler
         writepid(self.pidfile)
         self.SCAN_SHED_DAY = config.SOPDS_SCAN_SHED_DAY
         self.SCAN_SHED_DOW = config.SOPDS_SCAN_SHED_DOW
