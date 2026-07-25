@@ -60,6 +60,10 @@ All notable changes to this project are documented here. The format is based on
 - Cleanups: fixed the always-true `assert` in `translit`, a loose INPX
   filename regex, `books_del_phisical` returning a tuple instead of a count,
   removed the dead `findauthor`, and silenced invalid-escape SyntaxWarnings.
+- Robustness: book annotations and MOBI titles decode with `errors='replace'`
+  (a non-utf8 payload no longer fails the import); cover thumbnailing is capped
+  by `Image.MAX_IMAGE_PIXELS` and falls back to the no-cover image on any
+  decode error (PIL decompression-bomb guard).
 
 ### Security
 - Env-gated production security settings: `SESSION_COOKIE_SECURE`,
