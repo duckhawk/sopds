@@ -12,7 +12,7 @@
 </script>
            
  {% if isbookshelf %}
- <div id="ConfirmModal" class="reveal tiny text-center" data-reveal>
+ <dialog id="ConfirmModal" class="reveal tiny text-center">
   <h5 id="ConfirmModalTitle">{% trans "Confirm to clear your bookshelf." %}</h5>
   <p></p>
   <p class="text-center"><a href="{% url "web:bsclear" %}" class="secondary button" id="Confirm_btnYes">{% trans "Clear" %}</a>
@@ -20,9 +20,9 @@
   <button class="close-button" data-close aria-label="Close modal" type="button">
     <span aria-hidden="true">&times;</span>
   </button>
-</div>
+</dialog>
 
- <a class="alert button small" data-open="ConfirmModal">{%  trans "Clear bookshelf" %}</a>
+ <button class="alert button small" type="button" onclick="document.getElementById('ConfirmModal').showModal()">{% trans "Clear bookshelf" %}</button>
  {% endif %}
 
 {%  for b in books %}
@@ -88,7 +88,7 @@
 					</select>
 					<b>{% trans "Rating:" %}</b>
 					<span class="bs-stars" data-book="{{ b.id }}" data-rating="{{ b.rating|default:0 }}">
-						{% for n in "12345" %}<a href="#" class="bs-star" data-n="{{ forloop.counter }}" onclick="bsSetRating({{ b.id }}, {{ forloop.counter }});return false;" style="text-decoration:none;font-size:130%;color:#f15a23;">&#9734;</a>{% endfor %}
+						{% for n in "12345" %}<a href="#" class="bs-star" data-n="{{ forloop.counter }}" onclick="bsSetRating({{ b.id }}, {{ forloop.counter }});return false;" style="text-decoration:none;font-size:130%;color:var(--accent);">&#9734;</a>{% endfor %}
 					</span>
 				</div>
 				{% endif %}
