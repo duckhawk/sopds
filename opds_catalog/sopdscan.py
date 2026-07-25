@@ -9,6 +9,7 @@ import re
 from book_tools.format import create_bookfile, MAX_BOOK_BYTES
 from book_tools.format.util import strip_symbols
 
+from django.db import transaction
 from django.utils.translation import gettext as _
 
 from opds_catalog import fb2parse, opdsdb
@@ -95,33 +96,41 @@ class opdsScanner:
                 dirs[:] = []
                 continue
             visited_dirs.add(real_path)
-            # Если разрешена обработка inpx, то при нахождении inpx обрабатываем его и прекращаем обработку текущего каталога
-            if config.SOPDS_INPX_ENABLE:
-                inpx_files = [inpx for inpx in files if re.search(r'\.inpx$', inpx, re.IGNORECASE)]
-                # Пропускаем обработку файлов в текущем каталоге, если найдены inpx
-                if inpx_files:
-                    for inpx_file in inpx_files:
-                        file = os.path.join(full_path, inpx_file)
-                        self.processinpx(inpx_file, full_path, file)                       
-                    continue
-                
-            for name in files:
-                file=os.path.join(full_path,name)
-                (n,e)=os.path.splitext(name)
-                if (e.lower() == '.zip'):
-                    if config.SOPDS_ZIPSCAN:
-                        self.processzip(name,full_path,file)
-                else:
-                    file_size=os.path.getsize(file)
-                    self.processfile(name,full_path,file,None,0,file_size)                   
+            # Commit per directory instead of wrapping the whole walk in one
+            # transaction: earlier directories stay durable if the scan is
+            # interrupted, no multi-hour lock is held, and a failure in one
+            # directory can't roll back the entire run.
+            with transaction.atomic():
+                # Если разрешена обработка inpx, то при нахождении inpx обрабатываем его и прекращаем обработку текущего каталога
+                if config.SOPDS_INPX_ENABLE:
+                    inpx_files = [inpx for inpx in files if re.search(r'\.inpx$', inpx, re.IGNORECASE)]
+                    # Пропускаем обработку файлов в текущем каталоге, если найдены inpx
+                    if inpx_files:
+                        for inpx_file in inpx_files:
+                            file = os.path.join(full_path, inpx_file)
+                            self.processinpx(inpx_file, full_path, file)
+                        continue
+
+                for name in files:
+                    file=os.path.join(full_path,name)
+                    (n,e)=os.path.splitext(name)
+                    if (e.lower() == '.zip'):
+                        if config.SOPDS_ZIPSCAN:
+                            self.processzip(name,full_path,file)
+                    else:
+                        file_size=os.path.getsize(file)
+                        self.processfile(name,full_path,file,None,0,file_size)
 
         #if config.SOPDS_DELETE_LOGICAL:
         #    self.books_deleted=opdsdb.books_del_logical()
         #else:
         #    self.books_deleted=opdsdb.books_del_phisical()
             
-        self.books_deleted=opdsdb.books_del_phisical()
-        
+        # Keep the delete-sweep atomic on its own: it removes every book not
+        # re-marked avail=2 by this scan, and must be all-or-nothing.
+        with transaction.atomic():
+            self.books_deleted=opdsdb.books_del_phisical()
+
         self.log_stats()
 
     def inpskip_callback(self, inpx, inp_file, inp_size):

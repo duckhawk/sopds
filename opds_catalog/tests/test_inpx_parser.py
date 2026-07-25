@@ -4,7 +4,6 @@ Covers issues #45 (cp1251 INP records must not abort the scan) and #49 (an
 untrusted FOLDER value must not escape the collection directory). The INPX
 parser previously had no test coverage at all.
 """
-import os
 import zipfile
 
 import pytest

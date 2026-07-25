@@ -9,7 +9,7 @@ except ImportError:   # Windows has no fcntl; locking is then a no-op.
     fcntl = None
 
 from django.core.management.base import BaseCommand
-from django.db import transaction, connection, connections
+from django.db import connection, connections
 from django.conf import settings as main_settings
 
 from opds_catalog.models import Counter
@@ -116,8 +116,9 @@ class Command(BaseCommand):
                 del(connections._connections.default)
 
             scanner=opdsScanner(self.logger)
-            with transaction.atomic():
-                scanner.scan_all()
+            # scan_all() now commits per directory (and keeps the delete-sweep
+            # atomic on its own), so it is not wrapped in one giant transaction.
+            scanner.scan_all()
             Counter.objects.update_known_counters()
         finally:
             self.scan_is_active = False

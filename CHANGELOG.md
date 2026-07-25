@@ -64,6 +64,9 @@ All notable changes to this project are documented here. The format is based on
   (a non-utf8 payload no longer fails the import); cover thumbnailing is capped
   by `Image.MAX_IMAGE_PIXELS` and falls back to the no-cover image on any
   decode error (PIL decompression-bomb guard).
+- The library scan now commits per directory (with the delete-sweep kept
+  atomic) instead of wrapping the whole walk in one transaction, so an
+  interrupted scan keeps its progress and holds no multi-hour lock.
 
 ### Security
 - Env-gated production security settings: `SESSION_COOKIE_SECURE`,
