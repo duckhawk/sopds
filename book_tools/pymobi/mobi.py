@@ -247,19 +247,22 @@ class BookMobi(object):
         ('unknown248',               '>L',  248),
         ('unknown252',               '>L',  252),
     ]
-    header = OrderedDict()
-    records = OrderedDict()
-    palmdoc = OrderedDict()
-    mobi = OrderedDict()
-    mobi_exth = OrderedDict()
-    book = OrderedDict()
-    compression = None
-
     def __init__(self, file):
         if isinstance(file, str):
             f = open(file, 'rb')
         else:
             f = file
+
+        # Per-instance parse state. These MUST NOT be class attributes: two
+        # concurrent parses (e.g. two Cover requests) would otherwise share and
+        # corrupt each other's records/metadata.
+        self.header = OrderedDict()
+        self.records = OrderedDict()
+        self.palmdoc = OrderedDict()
+        self.mobi = OrderedDict()
+        self.mobi_exth = OrderedDict()
+        self.book = OrderedDict()
+        self.compression = None
 
         self.f = f
         self.f.seek(0,0)

@@ -32,6 +32,8 @@ All notable changes to this project are documented here. The format is based on
   minimum of 1 so a `0` value can no longer make every page 500.
 - OPDS Basic-auth now answers **401** (not 500) for a malformed `Authorization`
   header (bad base64, non-utf8 bytes, or a missing `:` separator).
+- MOBI parser keeps its parse state per-instance instead of on the class, so
+  concurrent cover/metadata parses no longer corrupt each other.
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound
