@@ -283,7 +283,7 @@ def Cover(request, book_id, thumbnail=False):
             fo.close()
             z.close()
             fz.close()
-    except:
+    except Exception:
         book_data = None
         image = None
 
@@ -362,7 +362,7 @@ def Cover0(request, book_id, thumbnail = False):
                     response["Content-Type"] = fb2.cover_image.getattr('content-type')
                 response.write(dstr)
                 c0=1
-            except:
+            except Exception:
                 c0=0
 
     if c0==0:
@@ -456,11 +456,11 @@ def ConvertFB2(request, book_id, convert_type):
     try: 
         if tmp_fb2_path:
             os.remove(tmp_fb2_path)
-    except: 
+    except Exception: 
         pass
     try: 
         os.remove(tmp_conv_path)
-    except: 
+    except Exception: 
         pass
 
     return response

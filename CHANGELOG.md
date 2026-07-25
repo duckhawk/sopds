@@ -25,6 +25,13 @@ All notable changes to this project are documented here. The format is based on
   uses `-c`), so the test environment never drifts from production.
 
 ### Fixed
+- **Security:** the OIDC client secret and Telegram API token are entered
+  through a masked password field in the constance admin instead of being
+  shown in clear text.
+- Narrowed bare `except:` clauses to `except Exception:` in the download views
+  and the FB2/EPUB parsers, so `KeyboardInterrupt`/`SystemExit` propagate
+  instead of being swallowed.
+- Removed the empty, unused `opds_catalog/views.py`.
 - **Security:** open redirect in `LoginView` (`?next=` is now validated with
   `url_has_allowed_host_and_scheme`).
 - Hardened the book-conversion route: `convert_type` restricted to `epub|mobi`

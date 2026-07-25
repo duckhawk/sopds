@@ -52,7 +52,7 @@ class FB2Base(BookFile):
             with open(os.path.join(working_dir, 'cover.jpeg'), 'wb') as cover_file:
                 cover_file.write(content)
             return ('cover.jpeg', False)
-        except:
+        except Exception:
             return (None, False)
 
     def extract_cover_memory(self):
@@ -201,7 +201,7 @@ class FB2Zip(FB2Base):
         with self.__zip_file.open(self.__infos[0]) as entry:
             try:
                 return etree.fromstring(entry.read(50 * 1024 * 1024), parser=safe_lxml_parser())
-            except:
+            except Exception:
                 raise FB2StructureException('\'%s\' is not a valid XML' % self.__infos[0].filename)
 
     def __exit__(self, kind, value, traceback):

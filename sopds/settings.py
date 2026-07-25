@@ -246,6 +246,14 @@ CONSTANCE_ADDITIONAL_FIELDS = {
         'widget': 'django.forms.Select',
         'choices': (("ru-RU", "Russian"), ("en-US", "English"))
     }],
+    # Masked input for secrets (OIDC client secret, Telegram token) so they are
+    # not shown in clear text on the constance admin page. render_value keeps the
+    # stored value on save; required=False allows clearing it.
+    'password_input': ['django.forms.fields.CharField', {
+        'widget': 'django.forms.PasswordInput',
+        'widget_kwargs': {'render_value': True},
+        'required': False,
+    }],
 }
 
 CONSTANCE_CONFIG = OrderedDict([
@@ -255,7 +263,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_SCAN_START_DIRECTLY', (False,_('Turn once scanning directly'))),
     ('SOPDS_CACHE_TIME', (1200, _('Pages cache time'))),
 
-    ('SOPDS_TELEBOT_API_TOKEN', ('', _('Telegramm API Token'))),
+    ('SOPDS_TELEBOT_API_TOKEN', ('', _('Telegramm API Token'), 'password_input')),
     ('SOPDS_TELEBOT_AUTH', (True,_('Enable telebot authentication. Test presense telegram username in local users database (case insensetive).'))),
     ('SOPDS_TELEBOT_MAXITEMS', (10, _('Max items on page'))),
     
@@ -297,7 +305,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_OIDC_ENABLE', (False, _('Enable OIDC (Keycloak) login on the web login page'))),
     ('SOPDS_OIDC_ISSUER', ('', _('OIDC issuer URL (Keycloak realm), e.g. https://keycloak.example.com/realms/library'))),
     ('SOPDS_OIDC_CLIENT_ID', ('', _('OIDC client ID'))),
-    ('SOPDS_OIDC_CLIENT_SECRET', ('', _('OIDC client secret'))),
+    ('SOPDS_OIDC_CLIENT_SECRET', ('', _('OIDC client secret'), 'password_input')),
     ('SOPDS_OIDC_SCOPES', ('openid email profile', _('OIDC scopes (space-separated)'))),
     ('SOPDS_OIDC_BUTTON_TEXT', ('Log in with Keycloak', _('Text on the OIDC login button'))),
 
