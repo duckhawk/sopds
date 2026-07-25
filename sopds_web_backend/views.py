@@ -365,7 +365,7 @@ def ThemeView(request):
         theme.save(update_fields=["theme_css"])
     else:
         Theme.objects.create(user=request.user, theme_css="css/sopds-dark.css")
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER') or reverse('web:main'))
 
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
@@ -686,12 +686,23 @@ def GenresView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BSAddView(request):
-    if request.GET and request.GET.get('book', None):
-        book = int(request.GET['book'])
-        bookshelf.objects.get_or_create(user=request.user,
-                                        book_id=book)
+    book = request.GET.get('book')
+    if book:
+        try:
+            bookshelf.objects.get_or_create(user=request.user, book_id=int(book))
+        except (TypeError, ValueError):
+            book = None
 
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER').split('#')[0] + '#' + request.GET['book'])
+    # Fall back to the main page when there is no Referer (previously
+    # None.split(...) -> 500), and don't assume the `book` param is present.
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        target = referer.split('#')[0]
+        if book:
+            target = '%s#%s' % (target, book)
+    else:
+        target = reverse('web:main')
+    return HttpResponseRedirect(target)
 
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")

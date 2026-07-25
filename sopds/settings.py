@@ -199,8 +199,7 @@ else:
 # Reuse DB connections across requests instead of opening a new TCP+auth
 # connection every request. SOPDS issues many small queries per page, so the
 # per-request connection overhead is significant. Skipped for sqlite (local file).
-# NOTE: in production DATABASES is overridden by sopds/private_settings.py, so the
-# same CONN_MAX_AGE is set there too.
+# NOTE: in production the DB comes from the MYSQL_*/POSTGRES_* env vars above.
 if DATABASES['default']['ENGINE'] != 'django.db.backends.sqlite3':
     DATABASES['default'].setdefault('CONN_MAX_AGE', 60)
 

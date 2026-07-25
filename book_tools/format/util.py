@@ -2,7 +2,7 @@
 #from PIL import Image, ImageFile
 from lxml import etree
 
-strip_symbols = ' »«\'\"\&\n-.#\\\`'
+strip_symbols = " »«'\"&\n-.#\\`"
 
 
 def safe_lxml_parser():

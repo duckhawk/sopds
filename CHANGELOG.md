@@ -55,6 +55,11 @@ All notable changes to this project are documented here. The format is based on
 - The scanner takes a cross-process `flock` before scanning, so an overlapping
   run (cron + manual) can no longer corrupt the `avail` sweep and delete live
   books. `apscheduler` is now imported lazily (only for `start`).
+- `BSAddView`/`ThemeView` no longer 500 when the request has no `Referer`
+  header; they fall back to the main page.
+- Cleanups: fixed the always-true `assert` in `translit`, a loose INPX
+  filename regex, `books_del_phisical` returning a tuple instead of a count,
+  removed the dead `findauthor`, and silenced invalid-escape SyntaxWarnings.
 
 ### Security
 - Env-gated production security settings: `SESSION_COOKIE_SECURE`,

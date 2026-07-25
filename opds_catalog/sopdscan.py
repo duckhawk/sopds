@@ -97,7 +97,7 @@ class opdsScanner:
             visited_dirs.add(real_path)
             # Если разрешена обработка inpx, то при нахождении inpx обрабатываем его и прекращаем обработку текущего каталога
             if config.SOPDS_INPX_ENABLE:
-                inpx_files = [inpx for inpx in files if re.match('.*(.inpx|.INPX)$', inpx)]
+                inpx_files = [inpx for inpx in files if re.search(r'\.inpx$', inpx, re.IGNORECASE)]
                 # Пропускаем обработку файлов в текущем каталоге, если найдены inpx
                 if inpx_files:
                     for inpx_file in inpx_files:
