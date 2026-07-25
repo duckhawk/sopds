@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Lectern">
+  <rect width="48" height="48" rx="11" fill="#6a8f6f"/>
+  <!-- bold reading board (rounded via matching stroke) -->
+  <path d="M15 10.5 H33 L37.2 23 H10.8 Z" fill="#f4f1e9" stroke="#f4f1e9" stroke-width="2.6" stroke-linejoin="round"/>
+  <!-- single centre fold, kept legible at 16px -->
+  <path d="M24 12 V22.5" stroke="#6a8f6f" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+  <!-- bold stand + foot -->
+  <g stroke="#f4f1e9" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M24 24 V34.5"/>
+    <path d="M16 40 H32"/>
+  </g>
+</svg>
