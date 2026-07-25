@@ -54,5 +54,9 @@ All notable changes to this project are documented here. The format is based on
   `MultipleObjectsReturned`.
 
 ### Security
+- Env-gated production security settings: `SESSION_COOKIE_SECURE`,
+  `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`
+  (+ subdomains/preload), `SECURE_PROXY_SSL_HEADER` and `CSRF_TRUSTED_ORIGINS`.
+  All default off (behaviour unchanged); enable when served over HTTPS.
 - Regression test locking in that `alphabet_menu()` passes user input as bound
   parameters (no SQL injection) and escapes LIKE wildcards.
