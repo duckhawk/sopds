@@ -194,12 +194,11 @@ def inpx_skip(arcpath, arcsize):
 
 def findcat(cat_name):
     (head,tail)=os.path.split(cat_name)
-    try:
-        catalog = Catalog.objects.get(cat_name=tail[:SIZE_CAT_CATNAME], path=cat_name[:SIZE_CAT_PATH])
-    except Catalog.DoesNotExist:
-        catalog = None
-
-    return catalog
+    # .first() (not .get()): there is no DB unique constraint on (cat_name,
+    # path), and a duplicate row (e.g. from an interrupted/overlapping scan or
+    # a truncation collision) made .get() raise MultipleObjectsReturned and
+    # abort the whole scan.
+    return Catalog.objects.filter(cat_name=tail[:SIZE_CAT_CATNAME], path=cat_name[:SIZE_CAT_PATH]).first()
 
 def addcattree(cat_name, archive=0, size = 0):
     catalog = findcat(cat_name)
@@ -217,10 +216,10 @@ def findbook(name, path, setavail=0):
     # Здесь специально не делается проверка avail, т.к. если удаление было логическим,
     # а книга была восстановлена в своем старом месте
     # то произойдет восстановление записи об этой книги а не добавится новая
-    try:
-        book = Book.objects.get(filename=name[:SIZE_BOOK_FILENAME], path=path[:SIZE_BOOK_PATH])
-    except Book.DoesNotExist:
-        book = None
+    # .first() (not .get()): no DB unique constraint exists on (filename, path),
+    # so a duplicate row would otherwise raise MultipleObjectsReturned and abort
+    # the scan.
+    book = Book.objects.filter(filename=name[:SIZE_BOOK_FILENAME], path=path[:SIZE_BOOK_PATH]).first()
 
     if book and setavail:
         book.avail=2

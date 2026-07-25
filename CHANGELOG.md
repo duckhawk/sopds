@@ -49,6 +49,9 @@ All notable changes to this project are documented here. The format is based on
 - **Security:** the FB2/EPUB parsers (lxml and expat) no longer resolve XML
   entities, closing an XXE local-file-disclosure and a billion-laughs DoS on
   crafted book files (scan path and the in-browser FB2 reader).
+- A duplicate book/catalog row no longer aborts the whole scan: `findbook`
+  and `findcat` return the first match instead of raising
+  `MultipleObjectsReturned`.
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound
