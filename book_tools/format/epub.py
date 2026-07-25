@@ -1,4 +1,4 @@
-import os, shutil, urllib, zipfile
+import os, shutil, urllib.parse, zipfile
 from lxml import etree
 from tempfile import mktemp
 
@@ -156,7 +156,7 @@ class EPub(BookFile):
             try:
                 fileinfo = self.__zip_file.getinfo(path)
             except:
-                fileinfo = self.__zip_file.getinfo(urllib.unquote(path))
+                fileinfo = self.__zip_file.getinfo(urllib.parse.unquote(path))
             mime = node.get('media-type')
             info = {
                 'filename': fileinfo.filename,
