@@ -136,6 +136,7 @@ class fb2parser:
        self.book_title=fb2tag(('description','title-info','book-title'))
        self.annotation=fb2tag(('description','title-info','annotation','p'))
        self.docdate=fb2tag(('description','document-info','date'))
+       self.isbn=fb2tag(('description','publish-info','isbn'))
        self.series=fb2tag(('description','title-info','sequence'))
        if self.rc!=0:
           self.cover_name = fb2tag (('description','coverpage','image'))
@@ -156,6 +157,7 @@ class fb2parser:
        self.annotation.reset()
        self.series.reset()
        self.docdate.reset()
+       self.isbn.reset()
        if self.rc!=0:
           self.cover_name.reset()
           self.cover_image.reset()
@@ -170,6 +172,7 @@ class fb2parser:
           self.book_title.tagopen(name)
           self.annotation.tagopen(name)
           self.docdate.tagopen(name,attrs)
+          self.isbn.tagopen(name)
           self.series.tagopen(name,attrs)
           if self.rc!=0:
              if self.cover_name.tagopen(name,attrs):
@@ -195,6 +198,7 @@ class fb2parser:
           self.book_title.tagclose(name)
           self.annotation.tagclose(name)
           self.docdate.tagclose(name)
+          self.isbn.tagclose(name)
           self.series.tagclose(name)
           if self.rc!=0:
              self.cover_name.tagclose(name)
@@ -228,6 +232,7 @@ class fb2parser:
           self.book_title.setvalue(data)
           self.annotation.setvalue(data)
           self.docdate.setvalue(data)
+          self.isbn.setvalue(data)
        if self.rc!=0:
           self.cover_image.add_data(data)
 
@@ -269,6 +274,7 @@ class FB2sax(BookFile):
         self.__detect_series_info()
         self.__detect_language()
         self.__detect_docdate()
+        self.__detect_isbn()
         self.description = self.__detect_description()
 
     def extract_cover_memory(self):
@@ -298,6 +304,11 @@ class FB2sax(BookFile):
             res = self.fb2parser.docdate.getvalue()[0].strip();
         if len(res) > 0:
             self.__set_docdate__(res)
+        return None
+
+    def __detect_isbn(self):
+        if len(self.fb2parser.isbn.getvalue()) > 0:
+            self.__set_isbn__(self.fb2parser.isbn.getvalue()[0])
         return None
 
     def __detect_authors(self):

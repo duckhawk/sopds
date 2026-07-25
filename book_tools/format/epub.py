@@ -137,6 +137,17 @@ class EPub(BookFile):
         if len(res) > 0 and res[0].text:
             self.description = res[0].text.strip()
 
+        # ISBN lives in a dc:identifier. Prefer one explicitly marked as ISBN
+        # (opf:scheme="ISBN"), otherwise accept any identifier whose value
+        # normalises to a valid ISBN (covers "urn:isbn:..." and bare numbers);
+        # __set_isbn__ validates the checksum, so UUID/URI identifiers are ignored.
+        res = tree.xpath('/opf:package/opf:metadata/dc:identifier', namespaces=namespaces)
+        scheme_attr = '{%s}scheme' % EPub.Namespace.OPF
+        for node in sorted(res, key=lambda n: 0 if (n.get(scheme_attr) or '').upper() == 'ISBN' else 1):
+            self.__set_isbn__(node.text or '')
+            if self.isbn:
+                break
+
         prefix = os.path.dirname(root_info.filename)
         if prefix:
             prefix += '/'

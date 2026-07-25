@@ -1,8 +1,58 @@
 #import PythonMagick
 #from PIL import Image, ImageFile
+import re
+
 from lxml import etree
 
 strip_symbols = " »«'\"&\n-.#\\`"
+
+
+def _valid_isbn10(s):
+    """True if `s` is a checksum-valid 10-char ISBN (last char may be 'X')."""
+    if len(s) != 10:
+        return False
+    total = 0
+    for i, ch in enumerate(s):
+        if ch == 'X' and i == 9:
+            v = 10
+        elif ch.isdigit():
+            v = int(ch)
+        else:
+            return False
+        total += (10 - i) * v
+    return total % 11 == 0
+
+
+def _valid_isbn13(s):
+    """True if `s` is a checksum-valid 13-digit ISBN."""
+    if len(s) != 13 or not s.isdigit():
+        return False
+    total = sum((1 if i % 2 == 0 else 3) * int(ch) for i, ch in enumerate(s))
+    return total % 10 == 0
+
+
+def normalize_isbn(raw):
+    """Normalise a raw metadata ISBN to bare digits (ISBN-13 / ISBN-10).
+
+    Accepts values as they appear in FB2/EPUB metadata: hyphenated or spaced,
+    with an ``ISBN``/``urn:isbn:`` prefix, or several identifiers packed in one
+    field (the first checksum-valid one wins). Returns '' when nothing valid is
+    found, so a junk or invalid identifier is simply not stored.
+    """
+    if not raw or not isinstance(raw, str):
+        return ''
+    # Split only on list separators (a field may hold several identifiers);
+    # spaces are group separators inside a single ISBN and are stripped below.
+    for token in re.split(r'[;,]+', raw.strip()):
+        t = token.strip().lower()
+        for pref in ('urn:isbn:', 'isbn:', 'isbn'):
+            if t.startswith(pref):
+                t = t[len(pref):]
+                break
+        t = t.replace('-', '').replace(' ', '').upper()
+        if _valid_isbn13(t) or _valid_isbn10(t):
+            return t
+    return ''
 
 
 def safe_lxml_parser():
