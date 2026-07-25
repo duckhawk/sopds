@@ -25,8 +25,6 @@ All notable changes to this project are documented here. The format is based on
 - Return **404 instead of 500** for missing or non-numeric ids across the
   download/convert/read/cover views, the genre and "doubles" search views, and
   the corresponding OPDS feeds.
-  download/convert/read/cover views, the genre, "doubles" and search-by-id
-  (`searchtype=i`) search views, and the corresponding OPDS feeds.
 - Paginator no longer renders a spurious empty last page when the item count
   is an exact multiple of the page size, and clamps `SOPDS_MAXITEMS` to a
   minimum of 1 so a `0` value can no longer make every page 500.
@@ -72,9 +70,5 @@ All notable changes to this project are documented here. The format is based on
 - Brute-force throttle on the web login form: after 10 failed attempts per
   client IP the login is locked out for 5 minutes (shared cache, so it holds
   across workers). A successful login clears the counter.
-- Env-gated production security settings: `SESSION_COOKIE_SECURE`,
-  `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`
-  (+ subdomains/preload), `SECURE_PROXY_SSL_HEADER` and `CSRF_TRUSTED_ORIGINS`.
-  All default off (behaviour unchanged); enable when served over HTTPS.
 - Regression test locking in that `alphabet_menu()` passes user input as bound
   parameters (no SQL injection) and escapes LIKE wildcards.

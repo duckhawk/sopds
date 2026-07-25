@@ -36,28 +36,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # backward compatibility. Restrict via ALLOWED_HOSTS env in production.
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
-
-def _env_bool(name, default=False):
-    return os.getenv(name, '1' if default else '').lower() in ('1', 'true', 'yes')
-
-
-# Security hardening. All default to off so behaviour is unchanged out of the
-# box; enable via env when the app is served over HTTPS (typically behind a
-# TLS-terminating proxy). See the Django deployment checklist.
-SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE')
-CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE')
-SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT')
-SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0') or 0)
-SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS')
-SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD')
-# Trust the proxy's X-Forwarded-Proto header (set when TLS is terminated
-# upstream) so request.is_secure() / redirects work correctly.
-if _env_bool('SECURE_PROXY_SSL_HEADER'):
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-# CSRF trusted origins must include the scheme (Django 4+), e.g.
-# "https://books.example.com". Comma-separated.
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
-
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.auth',    
@@ -199,7 +177,8 @@ else:
 # Reuse DB connections across requests instead of opening a new TCP+auth
 # connection every request. SOPDS issues many small queries per page, so the
 # per-request connection overhead is significant. Skipped for sqlite (local file).
-# NOTE: in production the DB comes from the MYSQL_*/POSTGRES_* env vars above.
+# NOTE: in production DATABASES is overridden by sopds/private_settings.py, so the
+# same CONN_MAX_AGE is set there too.
 if DATABASES['default']['ENGINE'] != 'django.db.backends.sqlite3':
     DATABASES['default'].setdefault('CONN_MAX_AGE', 60)
 
