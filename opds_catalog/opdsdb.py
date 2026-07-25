@@ -3,11 +3,10 @@
 import os
 import re
 
-from django.db.models import Q
 from django.utils.translation import gettext as _ , gettext_noop as _noop
 from django.db import transaction, connection
 
-from opds_catalog.models import Book, Catalog, Author, Genre, Series, bseries, bauthor, bgenre, LangCodes
+from opds_catalog.models import Book, Catalog, Author, Genre, Series, bseries, bauthor, bgenre, LangCodes, ScanSeen
 from opds_catalog.models import SIZE_BOOK_FILENAME, SIZE_BOOK_PATH, SIZE_BOOK_FORMAT, SIZE_BOOK_DOCDATE, SIZE_BOOK_LANG, SIZE_BOOK_TITLE, SIZE_BOOK_ANNOTATION
 from opds_catalog.models import SIZE_CAT_CATNAME, SIZE_CAT_PATH, SIZE_AUTHOR_NAME, SIZE_GENRE, SIZE_GENRE_SUBSECTION, SIZE_SERIES
 
@@ -89,15 +88,78 @@ def clear_genres(verbose=False):
     cursor = connection.cursor()
     cursor.execute('delete from opds_catalog_genre')
 
-# Книги где avail=0 уже известно что удалены
-# Книги где avail=2 это только что прверенные существующие книги
-# Устанавливаем avail=1 для книг которые не удалены. Во время проверки
-# если они не удалены им присвоится значение 2
-# Книги с avail=0 проверятся не будут и будут убраны из всех выдач и всех обработок.
+# Incremental-scan bookkeeping.
 #
-# три позиции (0,1,2) сделаны для того чтобы сделать возможным корректную работу
-# cgi-скрипта во время сканирования библиотеки
+# Old scheme: flip every non-deleted book to avail=1 up front, mark the ones
+# re-found during the walk back to avail=2, then delete everything left at
+# avail<=1. That start-of-scan `UPDATE opds_catalog_book SET avail=1` rewrote
+# the whole table on every scan (bloat + slow reads while scanning, and it was
+# the query that got orphaned and ran for hours).
 #
+# New scheme: don't touch the Book table up front at all. Record the id of each
+# book re-found or added into the scratch `ScanSeen` table (see mark_seen /
+# _mark_seen_qs), then delete the books NOT recorded (scan_finish, an anti-join
+# that only touches the actually-vanished rows). `avail` is kept only for the
+# logical-delete mode (avail=0) and is not read by the OPDS/web output.
+
+SEEN_BATCH = 5000
+
+
+def scan_begin():
+    """Start a scan pass: clear the scratch table of seen book ids.
+
+    Replaces avail_check_prepare()'s full-table `UPDATE avail=1` — nothing on
+    opds_catalog_book is written, so unchanged books are never rewritten.
+    """
+    ScanSeen.objects.all().delete()
+
+
+def mark_seen(book_id):
+    """Record a single book id as present in this scan pass."""
+    ScanSeen.objects.bulk_create([ScanSeen(book_id=book_id)], ignore_conflicts=True)
+
+
+def _mark_seen_qs(book_qs):
+    """Record every book matched by `book_qs` as seen; return how many.
+
+    Used by the archive skip fast-paths: an unchanged archive's books are all
+    still present, so mark them without re-reading the archive.
+    """
+    ids = list(book_qs.values_list('id', flat=True))
+    if ids:
+        ScanSeen.objects.bulk_create(
+            (ScanSeen(book_id=i) for i in ids), ignore_conflicts=True, batch_size=SEEN_BATCH)
+    return len(ids)
+
+
+def scan_finish(logical=False):
+    """Remove books not seen during this scan (anti-join on ScanSeen).
+
+    Physical delete relies on the ORM to cascade the m2m/bookshelf rows; the
+    logical mode just marks them avail=0. Deletes in id chunks so a large
+    delete set can't blow the SQL parameter limit.
+
+    Safety: if nothing was recorded as seen while the catalogue is non-empty,
+    refuse to delete — a real scan of a non-empty library always sees at least
+    one book, so an empty seen set means the scan didn't run (never wipe the
+    whole catalogue).
+    """
+    if ScanSeen.objects.count() == 0 and Book.objects.exists():
+        return 0
+
+    gone_ids = list(Book.objects.exclude(id__in=ScanSeen.objects.values('book_id'))
+                    .values_list('id', flat=True))
+    if not gone_ids:
+        return 0
+
+    for start in range(0, len(gone_ids), SEEN_BATCH):
+        chunk = gone_ids[start:start + SEEN_BATCH]
+        if logical:
+            Book.objects.filter(id__in=chunk).update(avail=0)
+        else:
+            Book.objects.filter(id__in=chunk).delete()
+    return len(gone_ids)
+
 
 def p(s,size):
     new = utfhigh.sub(u'',s[:size])
@@ -113,49 +175,32 @@ def getlangcode(s):
     
     return langcode
     
-def avail_check_prepare():
-    Book.objects.filter(~Q(avail=0)).update(avail=1)
-
-def books_del_logical():
-    row_count = Book.objects.filter(avail=1).update(avail=0)
-    return row_count
-
-def books_del_phisical():
-    # delete() returns (total, {label: n}); surface the integer count so the
-    # scanner's "deleted" stat/log is a number, consistent with books_del_logical.
-    row_count, _ = Book.objects.filter(avail__lte=1).delete()
-    # TODO: Разобратся нужно ли удалять записи в таблицах связи ManyToMany или они сами удалятся?
-    # sql='delete from '+TBL_BAUTHORS+' where book_id in (select book_id from '+TBL_BOOKS+' where avail<=1)'
-    # sql='delete from '+TBL_BGENRES+' where book_id in (select book_id from '+TBL_BOOKS+' where avail<=1)'
-    return row_count
-
 def arc_skip(arcpath,arcsize):
     """
        Выясняем изменялся ли архив (ZIP или INP-файл)
-       если нет, то пытаемся пропустить сканирование, устанавливая для всех книг из
-       архива avail=2
+       если нет, то пытаемся пропустить сканирование, помечая все книги из
+       архива как увиденные (seen)
        Если не одной такой книги не нашлось, то считаем что пропуск сканирования не удался
        и возвращаем 0
-       Если книги из искомого каталога имелись и для них установлен avail=2, то пропуск возможен 
-       и возвращаем 1 (или row_count)      
+       Если книги из искомого каталога имелись и помечены seen, то пропуск возможен
+       и возвращаем 1 (или row_count)
     """
     catalog = findcat(arcpath)
-    
+
     # Если такого каталога еще нет в БД, то значит считаем что ZIP изменен и пропуск невозможен
     if catalog == None:
         return 0
-    
+
     # Если каталог в БД найден и его размер совпадает с текущим, то считаем что файл архива не менялся
-    # Поэтому делаем update всех книг из этого архива, однако если ни одного изменения не произошло, то
-    # таких книг нет, поэтому видимо нужно пересканировать архив
+    # Поэтому помечаем все книги из этого архива как увиденные; если таких книг нет,
+    # то видимо нужно пересканировать архив
     if arcsize == catalog.cat_size:
-        row_count = Book.objects.filter(path=arcpath).update(avail=2)
-        return row_count 
-    
-    # Здесь мы оказываемся если размеры архива в БД и в наличии разные, поэтому считаем что изменения в архиве есть 
-    # и пропуск сканирования невозможен    
+        return _mark_seen_qs(Book.objects.filter(path=arcpath))
+
+    # Здесь мы оказываемся если размеры архива в БД и в наличии разные, поэтому считаем что изменения в архиве есть
+    # и пропуск сканирования невозможен
     return 0
-    
+
 
 def inp_skip(arcpath,arcsize):
     """
@@ -177,11 +222,10 @@ def inp_skip(arcpath,arcsize):
     # Поэтому делаем update всех книг из этого INPX, однако если ни одного изменения не произошло, то
     # таких книг нет, поэтому видимо нужно пересканировать архив
     if arcsize == catalog.cat_size:
-        row_count = Book.objects.filter(catalog__parent=catalog).update(avail=2)
-        return row_count     
-    
-    # Здесь мы оказываемся если размеры INPX в БД и в наличии разные, поэтому считаем что изменения в архиве есть 
-    # и пропуск сканирования невозможен        
+        return _mark_seen_qs(Book.objects.filter(catalog__parent=catalog))
+
+    # Здесь мы оказываемся если размеры INPX в БД и в наличии разные, поэтому считаем что изменения в архиве есть
+    # и пропуск сканирования невозможен
     return 0
 
 
@@ -205,10 +249,9 @@ def inpx_skip(arcpath, arcsize):
     # Поэтому делаем update всех книг из этого INPX, однако если ни одного изменения не произошло, то
     # таких книг нет, поэтому видимо нужно пересканировать архив
     if arcsize == catalog.cat_size:
-        row_count = Book.objects.filter(catalog__parent__parent=catalog).update(avail=2)
-        return row_count
+        return _mark_seen_qs(Book.objects.filter(catalog__parent__parent=catalog))
 
-        # Здесь мы оказываемся если размеры INPX в БД и в наличии разные, поэтому считаем что изменения в архиве есть
+    # Здесь мы оказываемся если размеры INPX в БД и в наличии разные, поэтому считаем что изменения в архиве есть
     # и пропуск сканирования невозможен
     return 0
 
@@ -241,9 +284,11 @@ def findbook(name, path, setavail=0):
     # the scan.
     book = Book.objects.filter(filename=name[:SIZE_BOOK_FILENAME], path=path[:SIZE_BOOK_PATH]).first()
 
+    # `setavail` keeps its old meaning "this book is present in the current
+    # scan": record it as seen (no write to the Book row) instead of the old
+    # book.avail=2; book.save().
     if book and setavail:
-        book.avail=2
-        book.save()
+        mark_seen(book.id)
 
     return book
 
@@ -251,6 +296,8 @@ def addbook(name, path, cat, exten, title, annotation, docdate, lang, size=0, ar
     book = Book.objects.create(filename=name[:SIZE_BOOK_FILENAME],path=path[:SIZE_BOOK_PATH],catalog=cat,filesize=size,format=exten.lower()[:SIZE_BOOK_FORMAT],
                 title=title[:SIZE_BOOK_TITLE],search_title=title.upper()[:SIZE_BOOK_TITLE],annotation=p(annotation,SIZE_BOOK_ANNOTATION),
                 docdate=docdate[:SIZE_BOOK_DOCDATE],lang=lang[:SIZE_BOOK_LANG],cat_type=archive,avail=2, lang_code=getlangcode(title))
+    # A freshly added book is present in this scan.
+    mark_seen(book.id)
     return book
 
 def addauthor(full_name):
