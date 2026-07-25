@@ -69,6 +69,9 @@ All notable changes to this project are documented here. The format is based on
   interrupted scan keeps its progress and holds no multi-hour lock.
 
 ### Security
+- Brute-force throttle on the web login form: after 10 failed attempts per
+  client IP the login is locked out for 5 minutes (shared cache, so it holds
+  across workers). A successful login clears the counter.
 - Env-gated production security settings: `SESSION_COOKIE_SECURE`,
   `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`
   (+ subdomains/preload), `SECURE_PROXY_SSL_HEADER` and `CSRF_TRUSTED_ORIGINS`.
