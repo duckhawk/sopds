@@ -24,3 +24,19 @@ def test_scan_lock_is_exclusive(tmp_path):
     fd3 = cmd._acquire_lock()      # released -> available again
     assert fd3 is not None
     cmd._release_lock(fd3)
+
+
+def test_acquire_scan_lock_is_exclusive(tmp_path):
+    # The vendor dispatch: on sqlite (tests) it falls back to the flock and
+    # returns a release callable; a second acquisition is refused until release.
+    cmd = Command()
+    cmd.pidfile = str(tmp_path / 's.pid')
+
+    release = cmd._acquire_scan_lock()
+    assert callable(release)
+    assert cmd._acquire_scan_lock() is None   # held
+
+    release()
+    release2 = cmd._acquire_scan_lock()       # available again
+    assert callable(release2)
+    release2()

@@ -12,8 +12,13 @@ from django.core.management.base import BaseCommand
 from django.db import connection, connections
 from django.conf import settings as main_settings
 
+from opds_catalog import opdsdb
 from opds_catalog.models import Counter
 from opds_catalog.sopdscan import opdsScanner
+
+# Fixed key for the scan's PostgreSQL session-level advisory lock. Arbitrary but
+# stable; shared by every scanner process against the same database.
+SCAN_ADVISORY_LOCK_KEY = 0x50D5_5CA4  # "SOPDS SCAN" mnemonic, fits a signed bigint
 #from opds_catalog.settings import SCANNER_LOG, SCAN_SHED_DAY, SCAN_SHED_DOW, SCAN_SHED_HOUR, SCAN_SHED_MIN, LOGLEVEL, SCANNER_PID
 from opds_catalog import settings 
 from constance import config
@@ -100,29 +105,61 @@ class Command(BaseCommand):
         finally:
             fd.close()
 
+    def _acquire_scan_lock(self):
+        """Acquire an exclusive scan lock; return a release callable, or None
+        if another scan already holds it.
+
+        On PostgreSQL use a **session-level advisory lock**: it is bound to the
+        DB connection, so it is released automatically when the scanner
+        process/pod dies mid-scan. A pidfile flock (below) is per-pod and goes
+        stale across pod restarts, which is why an interrupted scan could
+        overlap the next one. On other backends (dev/sqlite) fall back to the
+        flock.
+        """
+        if connection.vendor == 'postgresql':
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT pg_try_advisory_lock(%s)', [SCAN_ADVISORY_LOCK_KEY])
+                if not cursor.fetchone()[0]:
+                    return None
+            return self._release_pg_lock
+        fd = self._acquire_lock()
+        if fd is None:
+            return None
+        return lambda: self._release_lock(fd)
+
+    @staticmethod
+    def _release_pg_lock():
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT pg_advisory_unlock(%s)', [SCAN_ADVISORY_LOCK_KEY])
+
     def scan(self):
         if self.scan_is_active:
             self.stdout.write('Scan process already active. Skip currend job.')
             return
 
-        lock_fd = self._acquire_lock()
-        if lock_fd is None:
+        # Refresh a stale pooled connection before locking/scanning on it.
+        if connection.connection and not connection.is_usable():
+            connection.close()
+
+        release_lock = self._acquire_scan_lock()
+        if release_lock is None:
             self.stdout.write('Another scan is already running (locked). Skip current job.')
             return
 
         self.scan_is_active = True
         try:
-            if connection.connection and not connection.is_usable():
-                del(connections._connections.default)
-
             scanner=opdsScanner(self.logger)
-            # scan_all() now commits per directory (and keeps the delete-sweep
+            # scan_all() commits per directory (and keeps the delete-sweep
             # atomic on its own), so it is not wrapped in one giant transaction.
             scanner.scan_all()
             Counter.objects.update_known_counters()
+            # Reclaim the dead tuples the avail sweep churns and refresh stats /
+            # the visibility map, so post-scan reads keep their Index-Only Scans
+            # instead of slowing to tens of seconds until autovacuum catches up.
+            opdsdb.vacuum_analyze()
         finally:
             self.scan_is_active = False
-            self._release_lock(lock_fd)
+            release_lock()
         
     def update_shedule(self):
         self.SCAN_SHED_DAY = config.SOPDS_SCAN_SHED_DAY

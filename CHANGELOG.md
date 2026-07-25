@@ -65,6 +65,13 @@ All notable changes to this project are documented here. The format is based on
 - The library scan now commits per directory (with the delete-sweep kept
   atomic) instead of wrapping the whole walk in one transaction, so an
   interrupted scan keeps its progress and holds no multi-hour lock.
+- Scan mutual-exclusion uses a PostgreSQL **session advisory lock** (with a
+  pidfile-flock fallback on other backends): it is released automatically when
+  the scanner process/pod dies, so an interrupted scan can no longer overlap
+  the next one across restarts.
+- The scanner runs `VACUUM (ANALYZE)` on the catalog tables after each scan, so
+  the full-table `avail` sweep no longer leaves the alphabet-menu queries
+  slow (lost Index-Only Scan) until autovacuum catches up.
 
 ### Security
 - Brute-force throttle on the web login form: after 10 failed attempts per
