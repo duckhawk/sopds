@@ -88,10 +88,8 @@ msgid "Read"
 msgstr "Читать"
 
 #: templates/sopds_books.html:47
-#, fuzzy
-#| msgid "Delete from bookshelf"
 msgid "Delete this book from your bookshelf?"
-msgstr "Удалить с книжной полки"
+msgstr "Удалить эту книгу с книжной полки?"
 
 #: templates/sopds_books.html:48
 msgid "Delete from bookshelf"
@@ -337,7 +335,7 @@ msgstr "Вход"
 
 #: templates/sopds_nav.html:22
 msgid "Menu"
-msgstr ""
+msgstr "Меню"
 
 #: templates/sopds_nav.html:27 templates/sopds_settings.html:6 views.py:389
 msgid "Settings"
@@ -400,10 +398,8 @@ msgid "Genres"
 msgstr "Жанры"
 
 #: templates/sopds_nav.html:115
-#, fuzzy
-#| msgid "Search"
 msgid "Search by"
-msgstr "Найти"
+msgstr "Искать по"
 
 #: templates/sopds_selectauthor.html:16
 #, python-format
@@ -508,15 +504,15 @@ msgstr "ГЛАВНАЯ"
 
 #: views.py:899
 msgid "OIDC authentication failed."
-msgstr ""
+msgstr "Ошибка аутентификации OIDC."
 
 #: views.py:906
 msgid "This account cannot sign in via OIDC."
-msgstr ""
+msgstr "Эта учётная запись не может войти через OIDC."
 
 #: views.py:957
 msgid "Too many login attempts. Please try again later."
-msgstr ""
+msgstr "Слишком много попыток входа. Повторите попытку позже."
 
 #: views.py:973
 msgid "This account is not active!"

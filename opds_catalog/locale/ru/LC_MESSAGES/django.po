@@ -101,10 +101,9 @@ msgid "<b>Series: </b>%(series)s<br/>"
 msgstr "<b>Серий: </b>%(series)s<br/>"
 
 #: .\opds_catalog\feeds.py:322 .\opds_catalog\feeds.py:575
-#, fuzzy, python-format
-#| msgid "<b>No in Series: </b>%(ser_no)s<br/>"
+#, python-format
 msgid "<b>No in Series: </b>%(ser_no)s<br/>"
-msgstr "<b>No в серии: </b>%(series)s<br/>"
+msgstr "<b>№ в серии: </b>%(ser_no)s<br/>"
 
 #: .\opds_catalog\feeds.py:323 .\opds_catalog\feeds.py:576
 #, python-format

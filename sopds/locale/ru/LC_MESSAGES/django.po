@@ -165,10 +165,8 @@ msgid "Path to logfile for sopds_scanner process"
 msgstr "Путь к логфайлу для процесса sopds_scanner"
 
 #: .\sopds\settings.py:211
-#, fuzzy
-#| msgid "Path to logfile for sopds_server process"
 msgid "Path to logfile for sopds_telebot process"
-msgstr "Путь к логфайлу для процесса sopds_server"
+msgstr "Путь к логфайлу для процесса sopds_telebot"
 
 #: .\sopds\settings.py:212
 msgid "Path to pidfile for sopds_server process"
@@ -179,10 +177,8 @@ msgid "Path to pidfile for sopds_scanner process"
 msgstr "Путь к pid-файлу для процесса sopds_scanner"
 
 #: .\sopds\settings.py:214
-#, fuzzy
-#| msgid "Path to pidfile for sopds_server process"
 msgid "Path to pidfile for sopds_telebot process"
-msgstr "Путь к pid-файлу для процесса sopds_server"
+msgstr "Путь к pid-файлу для процесса sopds_telebot"
 
 #~ msgid "This flag activate extraction metadata from fb2 files"
 #~ msgstr "Флаг активирует извлеченеи метаданных из fb2-файлов"
