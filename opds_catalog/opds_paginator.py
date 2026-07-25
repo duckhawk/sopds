@@ -4,12 +4,17 @@ Created on 21 нояб. 2016 г.
 @author: mitsh
 '''
 
+import math
+
+
 class Paginator:
     def __init__(self, d1_count, d2_count, page_num=1, maxitems=60, half_pages_link = 3):
         self.d1_count = d1_count
         self.d2_count = d2_count
         self.count = self.d1_count + self.d2_count
-        self.MAXITEMS = maxitems
+        # MAXITEMS is admin-editable (constance SOPDS_MAXITEMS) with no min
+        # validator; guard against 0 so a page render can't ZeroDivisionError.
+        self.MAXITEMS = max(1, maxitems)
         self.HALF_PAGES_LINK = half_pages_link
         self.page_num = page_num      
         self.calc_data()                   
@@ -27,7 +32,9 @@ class Paginator:
         self.d2_last_pos =  d2_MAXITEMS*self.page_num - 1;
         self.d2_last_pos = self.d2_last_pos if self.d2_last_pos<self.d2_count else (self.d2_count-1 if self.d2_count else 0)
         
-        self.num_pages = self.count//self.MAXITEMS + 1
+        # ceil, not //+1: the latter added a spurious empty last page whenever
+        # count was an exact multiple of MAXITEMS (e.g. 60 items -> 2 pages).
+        self.num_pages = max(1, math.ceil(self.count / self.MAXITEMS))
         self.firstpage = self.page_num - self.HALF_PAGES_LINK
         self.lastpage = self.page_num + self.HALF_PAGES_LINK
         if self.firstpage<1:

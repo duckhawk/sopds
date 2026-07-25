@@ -25,6 +25,11 @@ All notable changes to this project are documented here. The format is based on
 - Return **404 instead of 500** for missing or non-numeric ids across the
   download/convert/read/cover views, the genre and "doubles" search views, and
   the corresponding OPDS feeds.
+  download/convert/read/cover views, the genre, "doubles" and search-by-id
+  (`searchtype=i`) search views, and the corresponding OPDS feeds.
+- Paginator no longer renders a spurious empty last page when the item count
+  is an exact multiple of the page size, and clamps `SOPDS_MAXITEMS` to a
+  minimum of 1 so a `0` value can no longer make every page 500.
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound
