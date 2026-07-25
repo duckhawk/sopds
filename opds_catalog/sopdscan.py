@@ -85,7 +85,16 @@ class opdsScanner:
                     
         opdsdb.avail_check_prepare()
             
+        # followlinks=True is kept so symlinked book directories are scanned,
+        # but a symlink cycle would otherwise recurse forever (os.walk docs).
+        # Track real directory paths already walked and prune revisits.
+        visited_dirs = set()
         for full_path, dirs, files in os.walk(config.SOPDS_ROOT_LIB, followlinks=True):
+            real_path = os.path.realpath(full_path)
+            if real_path in visited_dirs:
+                dirs[:] = []
+                continue
+            visited_dirs.add(real_path)
             # Если разрешена обработка inpx, то при нахождении inpx обрабатываем его и прекращаем обработку текущего каталога
             if config.SOPDS_INPX_ENABLE:
                 inpx_files = [inpx for inpx in files if re.match('.*(.inpx|.INPX)$', inpx)]

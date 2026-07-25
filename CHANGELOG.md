@@ -34,6 +34,8 @@ All notable changes to this project are documented here. The format is based on
   header (bad base64, non-utf8 bytes, or a missing `:` separator).
 - MOBI parser keeps its parse state per-instance instead of on the class, so
   concurrent cover/metadata parses no longer corrupt each other.
+- Library scan no longer loops forever on a symlink cycle: `scan_all()` prunes
+  directories whose real path was already walked.
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound
