@@ -36,6 +36,10 @@ All notable changes to this project are documented here. The format is based on
   concurrent cover/metadata parses no longer corrupt each other.
 - Library scan no longer loops forever on a symlink cycle: `scan_all()` prunes
   directories whose real path was already walked.
+- INPX parser hardened: INP records are decoded with `errors='replace'` (a
+  cp1251 collection no longer aborts the scan), zip/INP handles are closed via
+  `with`, and an untrusted `FOLDER` value can no longer escape the collection
+  directory (path traversal). First test coverage for the INPX parser.
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound
