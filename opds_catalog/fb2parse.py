@@ -1,5 +1,7 @@
 import xml.parsers.expat
 
+from book_tools.format.util import harden_expat
+
 class fb2tag:
    def __init__(self,tags):
        self.tags=tags
@@ -228,6 +230,7 @@ class fb2parser:
    def parse(self,f,hsize=0):
        self.reset()
        parser = xml.parsers.expat.ParserCreate()
+       harden_expat(parser)
        parser.StartElementHandler = self.start_element
        parser.EndElementHandler = self.end_element
        parser.CharacterDataHandler = self.char_data 

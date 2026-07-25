@@ -4,7 +4,7 @@ from abc import abstractmethod
 
 from book_tools.format.bookfile import BookFile
 from book_tools.format.mimetype import Mimetype
-from book_tools.format.util import list_zip_file_infos
+from book_tools.format.util import list_zip_file_infos, safe_lxml_parser
 
 class FB2StructureException(Exception):
     def __init__(self, error):
@@ -172,7 +172,7 @@ class FB2(FB2Base):
     def __create_tree__(self):
         try:
             self.file.seek(0,0)
-            return etree.parse(self.file)
+            return etree.parse(self.file, parser=safe_lxml_parser())
         except Exception as err:
             raise FB2StructureException('the file is not a valid XML (%s)'%err)
 
@@ -200,7 +200,7 @@ class FB2Zip(FB2Base):
     def __create_tree__(self):
         with self.__zip_file.open(self.__infos[0]) as entry:
             try:
-                return etree.fromstring(entry.read(50 * 1024 * 1024))
+                return etree.fromstring(entry.read(50 * 1024 * 1024), parser=safe_lxml_parser())
             except:
                 raise FB2StructureException('\'%s\' is not a valid XML' % self.__infos[0].filename)
 

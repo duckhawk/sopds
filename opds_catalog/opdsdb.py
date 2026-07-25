@@ -103,7 +103,9 @@ def books_del_logical():
     return row_count
 
 def books_del_phisical():
-    row_count = Book.objects.filter(avail__lte=1).delete()
+    # delete() returns (total, {label: n}); surface the integer count so the
+    # scanner's "deleted" stat/log is a number, consistent with books_del_logical.
+    row_count, _ = Book.objects.filter(avail__lte=1).delete()
     # TODO: Разобратся нужно ли удалять записи в таблицах связи ManyToMany или они сами удалятся?
     # sql='delete from '+TBL_BAUTHORS+' where book_id in (select book_id from '+TBL_BOOKS+' where avail<=1)'
     # sql='delete from '+TBL_BGENRES+' where book_id in (select book_id from '+TBL_BOOKS+' where avail<=1)'
@@ -194,12 +196,11 @@ def inpx_skip(arcpath, arcsize):
 
 def findcat(cat_name):
     (head,tail)=os.path.split(cat_name)
-    try:
-        catalog = Catalog.objects.get(cat_name=tail[:SIZE_CAT_CATNAME], path=cat_name[:SIZE_CAT_PATH])
-    except Catalog.DoesNotExist:
-        catalog = None
-
-    return catalog
+    # .first() (not .get()): there is no DB unique constraint on (cat_name,
+    # path), and a duplicate row (e.g. from an interrupted/overlapping scan or
+    # a truncation collision) made .get() raise MultipleObjectsReturned and
+    # abort the whole scan.
+    return Catalog.objects.filter(cat_name=tail[:SIZE_CAT_CATNAME], path=cat_name[:SIZE_CAT_PATH]).first()
 
 def addcattree(cat_name, archive=0, size = 0):
     catalog = findcat(cat_name)
@@ -217,10 +218,10 @@ def findbook(name, path, setavail=0):
     # Здесь специально не делается проверка avail, т.к. если удаление было логическим,
     # а книга была восстановлена в своем старом месте
     # то произойдет восстановление записи об этой книги а не добавится новая
-    try:
-        book = Book.objects.get(filename=name[:SIZE_BOOK_FILENAME], path=path[:SIZE_BOOK_PATH])
-    except Book.DoesNotExist:
-        book = None
+    # .first() (not .get()): no DB unique constraint exists on (filename, path),
+    # so a duplicate row would otherwise raise MultipleObjectsReturned and abort
+    # the scan.
+    book = Book.objects.filter(filename=name[:SIZE_BOOK_FILENAME], path=path[:SIZE_BOOK_PATH]).first()
 
     if book and setavail:
         book.avail=2
@@ -233,14 +234,6 @@ def addbook(name, path, cat, exten, title, annotation, docdate, lang, size=0, ar
                 title=title[:SIZE_BOOK_TITLE],search_title=title.upper()[:SIZE_BOOK_TITLE],annotation=p(annotation,SIZE_BOOK_ANNOTATION),
                 docdate=docdate[:SIZE_BOOK_DOCDATE],lang=lang[:SIZE_BOOK_LANG],cat_type=archive,avail=2, lang_code=getlangcode(title))
     return book
-
-def findauthor(full_name):
-    try:
-        author = Author.objects.filter(full_name=full_name[:SIZE_AUTHOR_NAME])[:1]
-    except Author.DoesNotExist:
-        author = None
-
-    return author
 
 def addauthor(full_name):
     author, created = Author.objects.get_or_create(full_name=full_name[:SIZE_AUTHOR_NAME], defaults={'search_full_name':full_name.upper()[:SIZE_AUTHOR_NAME], 

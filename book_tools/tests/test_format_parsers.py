@@ -9,6 +9,7 @@ from book_tools.format import create_bookfile, detect_mime, mime_detector
 from book_tools.format.mimetype import Mimetype
 from book_tools.format.epub import EPub
 from book_tools.format.mobi import Mobipocket
+from book_tools.pymobi.mobi import BookMobi
 
 DATA = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -70,3 +71,36 @@ def test_extension_less_book_still_imports():
     # End-to-end: an fb2 with an unrecognised name is parsed, not rejected.
     bf = create_bookfile(os.path.join(DATA, '262001.fb2'), 'book.bin')
     assert bf.title == 'The Sanctuary Sparrow'
+
+
+def test_create_bookfile_rejects_oversized(monkeypatch):
+    # #39: the outer read is capped so an oversized file can't buffer unbounded.
+    import book_tools.format as bf
+    from io import BytesIO
+    monkeypatch.setattr(bf, 'MAX_BOOK_BYTES', 100)
+    with pytest.raises(bf.BookTooLarge):
+        create_bookfile(BytesIO(b'x' * 500), 'big.fb2')
+
+
+def test_zip_within_cap(monkeypatch, tmp_path):
+    import book_tools.format as bf
+    import zipfile
+    p = tmp_path / 'a.zip'
+    with zipfile.ZipFile(p, 'w') as z:
+        z.writestr('a.txt', b'x' * 5000)
+    with zipfile.ZipFile(p) as z:
+        assert bf._zip_within_cap(z) is True
+        monkeypatch.setattr(bf, 'MAX_BOOK_BYTES', 1000)
+        assert bf._zip_within_cap(z) is False
+
+
+def test_mobi_parse_state_is_per_instance():
+    # Regression for #38: parse state (header/records/book/...) must live on the
+    # instance, not the class, or two concurrent parses corrupt each other.
+    path = os.path.join(DATA, 'robin_cook.mobi')
+    with open(path, 'rb') as f1, open(path, 'rb') as f2:
+        a = BookMobi(f1)
+        b = BookMobi(f2)
+    for attr in ('header', 'records', 'palmdoc', 'mobi', 'mobi_exth', 'book'):
+        assert getattr(a, attr) is not getattr(b, attr), attr
+    assert a.records and a.records == b.records  # same file -> equal, not identical

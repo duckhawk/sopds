@@ -1,7 +1,9 @@
 
 def toStr(src, coding='utf-8'):
     """ for python3 """
-    return src.decode(coding)
+    # errors='replace': a non-utf8 (e.g. cp1252) MOBI title/author must not
+    # raise UnicodeDecodeError and fail the whole book import.
+    return src.decode(coding, 'replace')
 
 
 def toByte(src, coding='utf-8'):

@@ -6,9 +6,10 @@ import datetime
 import logging
 import re
 
-from book_tools.format import create_bookfile
+from book_tools.format import create_bookfile, MAX_BOOK_BYTES
 from book_tools.format.util import strip_symbols
 
+from django.db import transaction
 from django.utils.translation import gettext as _
 
 from opds_catalog import fb2parse, opdsdb
@@ -85,34 +86,51 @@ class opdsScanner:
                     
         opdsdb.avail_check_prepare()
             
+        # followlinks=True is kept so symlinked book directories are scanned,
+        # but a symlink cycle would otherwise recurse forever (os.walk docs).
+        # Track real directory paths already walked and prune revisits.
+        visited_dirs = set()
         for full_path, dirs, files in os.walk(config.SOPDS_ROOT_LIB, followlinks=True):
-            # Если разрешена обработка inpx, то при нахождении inpx обрабатываем его и прекращаем обработку текущего каталога
-            if config.SOPDS_INPX_ENABLE:
-                inpx_files = [inpx for inpx in files if re.match('.*(.inpx|.INPX)$', inpx)]
-                # Пропускаем обработку файлов в текущем каталоге, если найдены inpx
-                if inpx_files:
-                    for inpx_file in inpx_files:
-                        file = os.path.join(full_path, inpx_file)
-                        self.processinpx(inpx_file, full_path, file)                       
-                    continue
-                
-            for name in files:
-                file=os.path.join(full_path,name)
-                (n,e)=os.path.splitext(name)
-                if (e.lower() == '.zip'):
-                    if config.SOPDS_ZIPSCAN:
-                        self.processzip(name,full_path,file)
-                else:
-                    file_size=os.path.getsize(file)
-                    self.processfile(name,full_path,file,None,0,file_size)                   
+            real_path = os.path.realpath(full_path)
+            if real_path in visited_dirs:
+                dirs[:] = []
+                continue
+            visited_dirs.add(real_path)
+            # Commit per directory instead of wrapping the whole walk in one
+            # transaction: earlier directories stay durable if the scan is
+            # interrupted, no multi-hour lock is held, and a failure in one
+            # directory can't roll back the entire run.
+            with transaction.atomic():
+                # Если разрешена обработка inpx, то при нахождении inpx обрабатываем его и прекращаем обработку текущего каталога
+                if config.SOPDS_INPX_ENABLE:
+                    inpx_files = [inpx for inpx in files if re.search(r'\.inpx$', inpx, re.IGNORECASE)]
+                    # Пропускаем обработку файлов в текущем каталоге, если найдены inpx
+                    if inpx_files:
+                        for inpx_file in inpx_files:
+                            file = os.path.join(full_path, inpx_file)
+                            self.processinpx(inpx_file, full_path, file)
+                        continue
+
+                for name in files:
+                    file=os.path.join(full_path,name)
+                    (n,e)=os.path.splitext(name)
+                    if (e.lower() == '.zip'):
+                        if config.SOPDS_ZIPSCAN:
+                            self.processzip(name,full_path,file)
+                    else:
+                        file_size=os.path.getsize(file)
+                        self.processfile(name,full_path,file,None,0,file_size)
 
         #if config.SOPDS_DELETE_LOGICAL:
         #    self.books_deleted=opdsdb.books_del_logical()
         #else:
         #    self.books_deleted=opdsdb.books_del_phisical()
             
-        self.books_deleted=opdsdb.books_del_phisical()
-        
+        # Keep the delete-sweep atomic on its own: it removes every book not
+        # re-marked avail=2 by this scan, and must be all-or-nothing.
+        with transaction.atomic():
+            self.books_deleted=opdsdb.books_del_phisical()
+
         self.log_stats()
 
     def inpskip_callback(self, inpx, inp_file, inp_size):
@@ -177,26 +195,37 @@ class opdsScanner:
         if opdsdb.arc_skip(rel_file,zsize):
             self.arch_skipped+=1
             self.logger.debug('Skip ZIP archive '+rel_file+'. Already scanned.')
-        else:                   
+        else:
             zip_process_error = 0
             try:
-                z = open_zipfile(file)
-                filelist = z.namelist()
-                cat = opdsdb.addcattree(rel_file, opdsdb.CAT_ZIP, zsize)
-                for n in filelist:
-                    try:
-                        self.logger.debug('Start process ZIP file = '+file+' book file = '+n)
-                        file_size=z.getinfo(n).file_size
-                        bookfile = z.open(n)
-                        self.processfile(n,file,bookfile,cat,opdsdb.CAT_ZIP,file_size)
-                        bookfile.close()
-                    except zipfile.BadZipFile:
-                        self.logger.warning('Error processing ZIP file = '+file+' book file = '+n)
-                        zip_process_error = 1
-                z.close()
+                with open_zipfile(file) as z:
+                    filelist = z.namelist()
+                    cat = opdsdb.addcattree(rel_file, opdsdb.CAT_ZIP, zsize)
+                    for n in filelist:
+                        try:
+                            self.logger.debug('Start process ZIP file = '+file+' book file = '+n)
+                            file_size=z.getinfo(n).file_size
+                            # Skip decompression bombs: a member declaring more
+                            # than the cap is not a real book.
+                            if file_size > MAX_BOOK_BYTES:
+                                self.logger.warning('Skip oversized ZIP member %s in %s (%d bytes)' % (n, file, file_size))
+                                continue
+                            with z.open(n) as bookfile:
+                                self.processfile(n,file,bookfile,cat,opdsdb.CAT_ZIP,file_size)
+                        except zipfile.BadZipFile:
+                            self.logger.warning('Error processing ZIP file = '+file+' book file = '+n)
+                            zip_process_error = 1
+                        except Exception:
+                            # A single unreadable member (encrypted, unsupported
+                            # compression, oversized) must not abort the archive.
+                            self.logger.exception('Error processing ZIP member %s in %s' % (n, file))
+                            zip_process_error = 1
                 self.arch_scanned+=1
             except zipfile.BadZipFile:
                 self.logger.warning('Error while read ZIP archive. File '+file+' corrupt.')
+                zip_process_error = 1
+            except Exception:
+                self.logger.exception('Error while read ZIP archive %s' % file)
                 zip_process_error = 1
             self.bad_archives+=zip_process_error
 
@@ -221,7 +250,7 @@ class opdsScanner:
                         lang = book_data.language_code.strip(strip_symbols) if book_data.language_code else ''
                         title = book_data.title.strip(strip_symbols) if book_data.title else n
                         annotation = book_data.description if book_data.description else ''
-                        annotation = annotation.strip(strip_symbols) if isinstance(annotation, str) else annotation.decode('utf8').strip(strip_symbols)
+                        annotation = annotation.strip(strip_symbols) if isinstance(annotation, str) else annotation.decode('utf8', 'replace').strip(strip_symbols)
                         docdate = book_data.docdate if book_data.docdate else ''
 
                         book=opdsdb.addbook(name,rel_path,cat,e[1:],title,annotation,docdate,lang,file_size,archive)

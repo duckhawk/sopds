@@ -20,6 +20,7 @@ from opds_catalog.ziptools import open_zipfile
 
 from book_tools.format import create_bookfile, mime_detector
 from book_tools.format.mimetype import Mimetype
+from book_tools.format.util import safe_lxml_parser
 
 from constance import config
 from PIL import Image
@@ -28,6 +29,11 @@ from opds_catalog.middleware import BasicAuthMiddleware
 
 
 logger = logging.getLogger(__name__)
+
+# Cover images come from untrusted books. Cap the pixel budget so a crafted
+# tiny-but-huge-dimension image raises DecompressionBombError instead of
+# allocating gigabytes (real covers are far below this).
+Image.MAX_IMAGE_PIXELS = 64_000_000
 
 
 def getFileName(book):
@@ -284,12 +290,20 @@ def Cover(request, book_id, thumbnail=False):
     if image:
         response["Content-Type"] = 'image/jpeg'
         if thumbnail:
-            thumb = Image.open(io.BytesIO(image)).convert('RGB')
-            thumb.thumbnail((settings.THUMB_SIZE, settings.THUMB_SIZE), Image.LANCZOS)
-            tfile = io.BytesIO()
-            thumb.save(tfile, 'JPEG')
-            image = tfile.getvalue()
-        response.write(image)
+            try:
+                # Cover bytes are attacker-controlled; a decompression-bomb
+                # image raises DecompressionBombError (Image.MAX_IMAGE_PIXELS)
+                # instead of allocating huge memory. Fall back to no-cover.
+                thumb = Image.open(io.BytesIO(image)).convert('RGB')
+                thumb.thumbnail((settings.THUMB_SIZE, settings.THUMB_SIZE), Image.LANCZOS)
+                tfile = io.BytesIO()
+                thumb.save(tfile, 'JPEG')
+                image = tfile.getvalue()
+            except Exception:
+                logger.warning('Thumbnail generation failed for book %s', book_id)
+                image = None
+        if image:
+            response.write(image)
 
     if not image:
         if os.path.exists(config.SOPDS_NOCOVER_PATH):
@@ -503,7 +517,9 @@ def ReadFB2(request, book_id):
         book_size=z.getinfo(book.filename).file_size
         fo= z.open(book.filename)
 
-    dom = ET.parse(fo)
+    # Untrusted book XML: parse with entity resolution/DTD/network disabled
+    # (XXE / billion-laughs guard). The stylesheet below is our own trusted file.
+    dom = ET.parse(fo, parser=safe_lxml_parser())
     xslt = ET.parse('%s/FB2_22_xhtml.xsl' % os.path.dirname(os.path.realpath(__file__)))
     transform = ET.XSLT(xslt)
     newdom = transform(dom)

@@ -365,7 +365,7 @@ def ThemeView(request):
         theme.save(update_fields=["theme_css"])
     else:
         Theme.objects.create(user=request.user, theme_css="css/sopds-dark.css")
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER') or reverse('web:main'))
 
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
@@ -686,12 +686,23 @@ def GenresView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BSAddView(request):
-    if request.GET and request.GET.get('book', None):
-        book = int(request.GET['book'])
-        bookshelf.objects.get_or_create(user=request.user,
-                                        book_id=book)
+    book = request.GET.get('book')
+    if book:
+        try:
+            bookshelf.objects.get_or_create(user=request.user, book_id=int(book))
+        except (TypeError, ValueError):
+            book = None
 
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER').split('#')[0] + '#' + request.GET['book'])
+    # Fall back to the main page when there is no Referer (previously
+    # None.split(...) -> 500), and don't assume the `book` param is present.
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        target = referer.split('#')[0]
+        if book:
+            target = '%s#%s' % (target, book)
+    else:
+        target = reverse('web:main')
+    return HttpResponseRedirect(target)
 
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
@@ -853,6 +864,37 @@ def OIDCCallbackView(request):
     return redirect(next_url)
 
 
+# Simple cache-backed brute-force throttle for the web login form: at most
+# LOGIN_RATE_LIMIT failed attempts per client IP within (and locked out for)
+# LOGIN_RATE_WINDOW seconds. Uses the shared cache (Redis in production), so it
+# holds across uWSGI workers. OPDS Basic-auth is intentionally not throttled —
+# e-readers legitimately re-send credentials on every request.
+LOGIN_RATE_LIMIT = 10
+LOGIN_RATE_WINDOW = 300
+
+
+def _login_ratelimit_key(request):
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    ip = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR', '')
+    return 'ratelimit:login:%s' % ip
+
+
+def _login_is_blocked(request):
+    return cache.get(_login_ratelimit_key(request), 0) >= LOGIN_RATE_LIMIT
+
+
+def _login_register_failure(request):
+    key = _login_ratelimit_key(request)
+    try:
+        cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, LOGIN_RATE_WINDOW)
+
+
+def _login_clear(request):
+    cache.delete(_login_ratelimit_key(request))
+
+
 def LoginView(request):
     args = {}
     args['breadcrumbs'] = [_('Login')]
@@ -863,7 +905,11 @@ def LoginView(request):
         password = request.POST['password']
     except KeyError:
         return render(request, 'sopds_login.html', args)
-    
+
+    if _login_is_blocked(request):
+        args['system_message'] = {'text': _('Too many login attempts. Please try again later.'), 'type': 'alert'}
+        return handler403(request, args)
+
     next_url = request.GET.get('next',reverse("web:main"))
     # Reject off-site ?next= targets to prevent an open redirect after login.
     if not url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
@@ -872,19 +918,17 @@ def LoginView(request):
     user = authenticate(username=username, password=password)
     if user is not None:
         if user.is_active:
+            _login_clear(request)
             login(request, user)
             return redirect(next_url)
         else:
+            _login_register_failure(request)
             args['system_message']={'text':_('This account is not active!'),'type':'alert'}
             return handler403(request,args)
-            #return render(request, 'sopds_login.html', args)
     else:
+        _login_register_failure(request)
         args['system_message']={'text':_('User does not exist or the password is incorrect!'),'type':'alert'}
         return handler403(request,args)
-        #return render(request, 'sopds_login.html', args)
-
-    return handler403(request,args)
-    #return render(request, 'sopds_login.html', args)
 
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
