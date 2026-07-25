@@ -1,4 +1,6 @@
 import base64
+import binascii
+
 from django.http import HttpResponse
 from django.contrib import auth
 from django.utils import translation
@@ -42,8 +44,15 @@ class BasicAuthMiddleware(object):
 
         if 'basic' != auth_meth.lower():
             return self.unauthed()
-        auth_data = base64.b64decode(auth_data.strip()).decode('utf-8')
-        username, password = auth_data.split(':',1)            
+
+        # A malformed credential blob (bad base64, non-utf8 bytes, or no ':'
+        # separator) is a bad request, not a server error: answer 401 instead
+        # of letting binascii.Error / UnicodeDecodeError / ValueError 500.
+        try:
+            auth_data = base64.b64decode(auth_data.strip()).decode('utf-8')
+            username, password = auth_data.split(':', 1)
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            return self.unauthed()
 
         user = auth.authenticate(username=username, password=password)
         if not (user and user.is_active):

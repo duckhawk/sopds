@@ -30,6 +30,8 @@ All notable changes to this project are documented here. The format is based on
 - Paginator no longer renders a spurious empty last page when the item count
   is an exact multiple of the page size, and clamps `SOPDS_MAXITEMS` to a
   minimum of 1 so a `0` value can no longer make every page 500.
+- OPDS Basic-auth now answers **401** (not 500) for a malformed `Authorization`
+  header (bad base64, non-utf8 bytes, or a missing `:` separator).
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound
