@@ -96,7 +96,7 @@ def detect_mime(file, original_filename):
             sniffed = __sniff_content(file)
             if sniffed is not None:
                 return sniffed
-    except:
+    except Exception:
         pass
 
     return mime
