@@ -9,7 +9,7 @@ except ImportError:   # Windows has no fcntl; locking is then a no-op.
     fcntl = None
 
 from django.core.management.base import BaseCommand
-from django.db import connection, connections
+from django.db import connection
 from django.conf import settings as main_settings
 
 from opds_catalog import opdsdb
@@ -171,7 +171,7 @@ class Command(BaseCommand):
     
     def check_settings(self):
         if connection.connection and not connection.is_usable():
-            del(connections._connections.default)        
+            connection.close()
         settings.constance_update_all()
         if not (self.SCAN_SHED_MIN==config.SOPDS_SCAN_SHED_MIN and \
            self.SCAN_SHED_HOUR==config.SOPDS_SCAN_SHED_HOUR and \

@@ -32,6 +32,10 @@ All notable changes to this project are documented here. The format is based on
   and the FB2/EPUB parsers, so `KeyboardInterrupt`/`SystemExit` propagate
   instead of being swallowed.
 - Removed the empty, unused `opds_catalog/views.py`.
+- `search_title`/`search_full_name`/`search_ser`/`full_name` default to `''`
+  instead of `None` (they are `NOT NULL` and always populated). Migration `0018`.
+- Scanner refreshes a stale connection via `connection.close()` instead of
+  deleting `connections._connections` internals (in `check_settings` too).
 - **Security:** open redirect in `LoginView` (`?next=` is now validated with
   `url_has_allowed_host_and_scheme`).
 - Hardened the book-conversion route: `convert_type` restricted to `epub|mobi`

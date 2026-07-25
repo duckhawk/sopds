@@ -48,7 +48,7 @@ class Book(models.Model):
     #favorite = models.IntegerField(null=False, default=0)
     lang = models.CharField(max_length=SIZE_BOOK_LANG)
     title = models.CharField(max_length=SIZE_BOOK_TITLE, db_index=True)
-    search_title = models.CharField(max_length=SIZE_BOOK_TITLE, default=None, db_index=True)
+    search_title = models.CharField(max_length=SIZE_BOOK_TITLE, default='', db_index=True)
     annotation = models.CharField(max_length=SIZE_BOOK_ANNOTATION)
     lang_code = models.IntegerField(null=False, default=9, db_index=True)
     avail = models.IntegerField(null=False, default=0, db_index=True)
@@ -66,8 +66,8 @@ class Catalog(models.Model):
 
 
 class Author(models.Model):
-    full_name = models.CharField(max_length=SIZE_AUTHOR_NAME, default=None, db_index=True)
-    search_full_name = models.CharField(max_length=SIZE_AUTHOR_NAME, default=None, db_index=True)
+    full_name = models.CharField(max_length=SIZE_AUTHOR_NAME, default='', db_index=True)
+    search_full_name = models.CharField(max_length=SIZE_AUTHOR_NAME, default='', db_index=True)
     lang_code = models.IntegerField(null=False, default=9, db_index=True)
 
 
@@ -92,7 +92,7 @@ class bgenre(models.Model):
 
 class Series(models.Model):
     ser = models.CharField(max_length=SIZE_SERIES, db_index=True)
-    search_ser = models.CharField(max_length=SIZE_SERIES, default=None, db_index=True)
+    search_ser = models.CharField(max_length=SIZE_SERIES, default='', db_index=True)
     lang_code = models.IntegerField(null=False, default=9,db_index=True)
 
 
