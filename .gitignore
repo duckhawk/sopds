@@ -10,4 +10,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+webdav_data/
+.venv/
 
+.DS_Store

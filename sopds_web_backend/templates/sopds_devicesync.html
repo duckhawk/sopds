@@ -1,0 +1,56 @@
+{% extends "sopds_main.html" %}
+{% load i18n %}
+
+{% block body %}
+<div class="row"><div class="large-8 column">
+	<h4>{% trans "Device sync" %}</h4>
+	<p>{% trans "Sync your reading progress between this library and e-reader apps." %}</p>
+
+	{% if message %}<div class="callout">{{ message }}</div>{% endif %}
+
+	{# --- KOReader (kosync) --- #}
+	<fieldset class="fieldset">
+		<legend>KOReader ({% trans "kosync" %})</legend>
+		{% if kosync_enabled %}
+			<p>{% blocktrans %}In KOReader open <b>Tools → Progress sync → Custom sync server</b> and enter:{% endblocktrans %}</p>
+			<ul>
+				<li>{% trans "Server" %}: <code>{{ kosync_url }}</code></li>
+				<li>{% trans "Username" %}: <code>{{ user.username }}</code></li>
+				<li>{% trans "Password" %}: {% trans "the sync password you set below" %}</li>
+			</ul>
+			<p>{% trans "Then choose Login (not Register)." %}</p>
+
+			<form method="post" action="{% url 'web:devicesync' %}">
+				{% csrf_token %}
+				<label for="sync_password">
+					{% if has_cred %}{% trans "Change sync password" %}{% else %}{% trans "Set sync password" %}{% endif %}
+				</label>
+				<input type="password" name="sync_password" id="sync_password" minlength="6" autocomplete="new-password">
+				<button type="submit" class="button">{% trans "Save" %}</button>
+				{% if has_cred %}
+					<button type="submit" name="action" value="clear" class="button alert">{% trans "Remove" %}</button>
+					<p><small>{% trans "A sync password is currently set." %}</small></p>
+				{% endif %}
+			</form>
+		{% else %}
+			<p><em>{% trans "The kosync API is disabled. Ask the administrator to enable SOPDS_KOSYNC_ENABLE." %}</em></p>
+		{% endif %}
+	</fieldset>
+
+	{# --- Moon+ Reader (WebDAV) --- #}
+	<fieldset class="fieldset">
+		<legend>Moon+ Reader Pro (WebDAV)</legend>
+		{% if webdav_enabled %}
+			<p>{% blocktrans %}In Moon+ Reader open <b>Options → Sync → WebDAV</b> and enter:{% endblocktrans %}</p>
+			<ul>
+				<li>{% trans "URL" %}: <code>{{ webdav_url }}</code></li>
+				<li>{% trans "Username" %}: <code>{{ user.username }}</code></li>
+				<li>{% trans "Password" %}: {% trans "your usual SOPDS login password" %}</li>
+			</ul>
+			<p><small>{% trans "WebDAV uses your normal SOPDS account — no separate password needed." %}</small></p>
+		{% else %}
+			<p><em>{% trans "The WebDAV endpoint is disabled. Ask the administrator to enable SOPDS_WEBDAV_ENABLE." %}</em></p>
+		{% endif %}
+	</fieldset>
+</div></div>
+{% endblock %}{# body #}

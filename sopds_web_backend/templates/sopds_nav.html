@@ -25,6 +25,7 @@
     <ul class="lx-account">
       {% if user.is_authenticated %}
         <li><a href="{% url "web:settings" %}"><i class="fi-widget"></i><span class="show-for-medium">{% trans "Settings" %}</span></a></li>
+        <li><a href="{% url "web:devicesync" %}"><i class="fi-refresh"></i><span class="show-for-medium">{% trans "Device sync" %}</span></a></li>
         {% if user.is_superuser %}
         <li><a href="{% url "admin:index" %}"><i class="fi-wrench"></i><span class="show-for-medium">{% trans "Admin" %}</span></a></li>
         {% endif %}
