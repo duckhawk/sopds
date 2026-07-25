@@ -7,7 +7,7 @@ from django.utils.translation import gettext as _ , gettext_noop as _noop
 from django.db import transaction, connection
 
 from opds_catalog.models import Book, Catalog, Author, Genre, Series, bseries, bauthor, bgenre, LangCodes, ScanSeen
-from opds_catalog.models import SIZE_BOOK_FILENAME, SIZE_BOOK_PATH, SIZE_BOOK_FORMAT, SIZE_BOOK_DOCDATE, SIZE_BOOK_LANG, SIZE_BOOK_TITLE, SIZE_BOOK_ANNOTATION
+from opds_catalog.models import SIZE_BOOK_FILENAME, SIZE_BOOK_PATH, SIZE_BOOK_FORMAT, SIZE_BOOK_DOCDATE, SIZE_BOOK_LANG, SIZE_BOOK_TITLE, SIZE_BOOK_ANNOTATION, SIZE_BOOK_ISBN
 from opds_catalog.models import SIZE_CAT_CATNAME, SIZE_CAT_PATH, SIZE_AUTHOR_NAME, SIZE_GENRE, SIZE_GENRE_SUBSECTION, SIZE_SERIES
 
 
@@ -292,10 +292,10 @@ def findbook(name, path, setavail=0):
 
     return book
 
-def addbook(name, path, cat, exten, title, annotation, docdate, lang, size=0, archive=0):
+def addbook(name, path, cat, exten, title, annotation, docdate, lang, size=0, archive=0, isbn=''):
     book = Book.objects.create(filename=name[:SIZE_BOOK_FILENAME],path=path[:SIZE_BOOK_PATH],catalog=cat,filesize=size,format=exten.lower()[:SIZE_BOOK_FORMAT],
                 title=title[:SIZE_BOOK_TITLE],search_title=title.upper()[:SIZE_BOOK_TITLE],annotation=p(annotation,SIZE_BOOK_ANNOTATION),
-                docdate=docdate[:SIZE_BOOK_DOCDATE],lang=lang[:SIZE_BOOK_LANG],cat_type=archive,avail=2, lang_code=getlangcode(title))
+                docdate=docdate[:SIZE_BOOK_DOCDATE],lang=lang[:SIZE_BOOK_LANG],cat_type=archive,avail=2, lang_code=getlangcode(title), isbn=(isbn or '')[:SIZE_BOOK_ISBN])
     # A freshly added book is present in this scan.
     mark_seen(book.id)
     return book

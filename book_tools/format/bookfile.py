@@ -1,7 +1,7 @@
 import os, re
 from abc import abstractmethod, ABCMeta
 
-from book_tools.format.util import minify_cover
+from book_tools.format.util import minify_cover, normalize_isbn
 
 class BookFile(object):
     __metaclass__ = ABCMeta
@@ -18,6 +18,7 @@ class BookFile(object):
         self.language_code = None
         self.issues = []
         self.docdate = ''
+        self.isbn = ''
 
     def __enter__(self):
         return self
@@ -66,6 +67,11 @@ class BookFile(object):
             sortkey = name.split()[-1]
         sortkey = BookFile.__normalise_string__(sortkey).lower()
         self.authors.append({'name': name, 'sortkey': sortkey})
+
+    def __set_isbn__(self, raw):
+        isbn = normalize_isbn(raw)
+        if isbn:
+            self.isbn = isbn
 
     def __add_tag__(self, text):
         if text and BookFile.__is_text(text):

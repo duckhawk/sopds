@@ -17,6 +17,7 @@ SIZE_BOOK_DOCDATE    = 32
 SIZE_BOOK_LANG       = 16
 SIZE_BOOK_TITLE      = 512
 SIZE_BOOK_ANNOTATION = 10000
+SIZE_BOOK_ISBN       = 20
 
 SIZE_CAT_CATNAME     = 190
 SIZE_CAT_PATH        = SIZE_BOOK_PATH
@@ -50,6 +51,7 @@ class Book(models.Model):
     title = models.CharField(max_length=SIZE_BOOK_TITLE, db_index=True)
     search_title = models.CharField(max_length=SIZE_BOOK_TITLE, default='', db_index=True)
     annotation = models.CharField(max_length=SIZE_BOOK_ANNOTATION)
+    isbn = models.CharField(max_length=SIZE_BOOK_ISBN, default='', blank=True, db_index=True)
     lang_code = models.IntegerField(null=False, default=9, db_index=True)
     avail = models.IntegerField(null=False, default=0, db_index=True)
     authors = models.ManyToManyField('Author', through='bauthor')
