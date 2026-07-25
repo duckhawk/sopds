@@ -823,8 +823,13 @@ def SearchSuggestView(request):
             for s in Series.objects.filter(search_ser__contains=up)[:10]:
                 suggestions.append({'label': s.ser, 'url': '%s?searchtype=s&searchterms=%d' % (base, s.id)})
         else:
-            for b in Book.objects.filter(search_title__contains=up)[:10]:
-                suggestions.append({'label': b.title, 'url': '%s?searchtype=i&searchterms=%d' % (base, b.id)})
+            # Show the first author next to the title so books with the same or
+            # similar title are distinguishable. prefetch_related avoids an extra
+            # query per suggestion.
+            for b in Book.objects.filter(search_title__contains=up).prefetch_related('authors')[:10]:
+                authors = list(b.authors.all())
+                label = '%s — %s' % (b.title, authors[0].full_name) if authors else b.title
+                suggestions.append({'label': label, 'url': '%s?searchtype=i&searchterms=%d' % (base, b.id)})
     return render(request, 'sopds_search_suggestions.html', {'suggestions': suggestions})
 
 

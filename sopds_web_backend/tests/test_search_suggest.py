@@ -37,6 +37,23 @@ def test_suggest_titles(logged_client):
 
 
 @pytest.mark.django_db
+def test_suggest_titles_show_first_author(logged_client):
+    from opds_catalog.models import bauthor
+    b1 = _make_book("Book One")
+    tolstoy = Author.objects.create(full_name="Leo Tolstoy", search_full_name="LEO TOLSTOY")
+    bauthor.objects.create(book=b1, author=tolstoy)
+    _make_book("Book Two")   # no author
+
+    resp = logged_client.post(
+        reverse("web:suggest"), {"searchterms": "book", "suggesttype": "title"}
+    )
+    body = resp.content.decode()
+    assert "Book One — Leo Tolstoy" in body   # title + first author
+    assert "Book Two" in body                  # authorless book still listed...
+    assert "Book Two —" not in body            # ...with no dangling separator
+
+
+@pytest.mark.django_db
 def test_suggest_authors(logged_client):
     Author.objects.create(full_name="Leo Tolstoy", search_full_name="LEO TOLSTOY")
     Author.objects.create(full_name="Mark Twain", search_full_name="MARK TWAIN")
