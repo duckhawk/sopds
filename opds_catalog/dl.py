@@ -20,6 +20,7 @@ from opds_catalog.ziptools import open_zipfile
 
 from book_tools.format import create_bookfile, mime_detector
 from book_tools.format.mimetype import Mimetype
+from book_tools.format.util import safe_lxml_parser
 
 from constance import config
 from PIL import Image
@@ -503,7 +504,9 @@ def ReadFB2(request, book_id):
         book_size=z.getinfo(book.filename).file_size
         fo= z.open(book.filename)
 
-    dom = ET.parse(fo)
+    # Untrusted book XML: parse with entity resolution/DTD/network disabled
+    # (XXE / billion-laughs guard). The stylesheet below is our own trusted file.
+    dom = ET.parse(fo, parser=safe_lxml_parser())
     xslt = ET.parse('%s/FB2_22_xhtml.xsl' % os.path.dirname(os.path.realpath(__file__)))
     transform = ET.XSLT(xslt)
     newdom = transform(dom)

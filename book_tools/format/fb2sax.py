@@ -4,7 +4,7 @@ import base64
 
 from book_tools.format.bookfile import BookFile
 from book_tools.format.mimetype import Mimetype
-from book_tools.format.util import strip_symbols
+from book_tools.format.util import strip_symbols, harden_expat
 
 class fb2tag:
    def __init__(self,tags):
@@ -234,6 +234,7 @@ class fb2parser:
    def parse(self,f,hsize=0):
         self.reset()
         parser = xml.parsers.expat.ParserCreate()
+        harden_expat(parser)
         parser.StartElementHandler = self.start_element
         parser.EndElementHandler = self.end_element
         parser.CharacterDataHandler = self.char_data

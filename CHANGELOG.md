@@ -46,6 +46,9 @@ All notable changes to this project are documented here. The format is based on
   `MAX_BOOK_BYTES` and zip members declaring more than the cap are skipped
   instead of decompressed. `processzip` also releases handles via `with` and
   no longer lets one unreadable archive member abort the archive.
+- **Security:** the FB2/EPUB parsers (lxml and expat) no longer resolve XML
+  entities, closing an XXE local-file-disclosure and a billion-laughs DoS on
+  crafted book files (scan path and the in-browser FB2 reader).
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound
