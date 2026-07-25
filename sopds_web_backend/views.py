@@ -37,7 +37,13 @@ def _int_param(request, name, default=0):
 
 
 def theme_css(user):
-    """Return the user's theme css in a single query (instead of exists()+get())."""
+    """Return the user's theme key in a single query (instead of exists()+get()).
+
+    The stored values ("css/sopds.css" / "css/sopds-dark.css") are now opaque
+    theme keys, not real files: the single lectern.css stylesheet is always
+    loaded and sopds_main.html selects light/dark via `data-theme` from whether
+    this key contains "dark".
+    """
     theme = Theme.objects.filter(user=user).first()
     return theme.theme_css if theme else "css/sopds.css"
 

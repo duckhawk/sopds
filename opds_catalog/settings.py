@@ -5,8 +5,8 @@ loglevels={'debug':logging.DEBUG,'info':logging.INFO,'warning':logging.WARNING,'
 NOZIP_FORMATS = ['epub', 'mobi']
 
 VERSION = "0.49"
-TITLE = getattr(settings, "SOPDS_TITLE", "SimpleOPDS")
-SUBTITLE = getattr(settings, "SOPDS_SUBTITLE", "SimpleOPDS Catalog by www.sopds.ru. Version %s."%VERSION)
+TITLE = getattr(settings, "SOPDS_TITLE", "Lectern")
+SUBTITLE = getattr(settings, "SOPDS_SUBTITLE", "Lectern — OPDS catalog. Version %s."%VERSION)
 ICON = getattr(settings, "SOPDS_ICON", "/static/images/favicon.ico")
 THUMB_SIZE = 100
 

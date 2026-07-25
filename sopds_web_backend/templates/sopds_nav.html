@@ -1,0 +1,127 @@
+{% load static %}
+{% load i18n %}
+
+<nav class="lx-nav">
+  <div class="lx-nav-inner">
+
+    <input type="checkbox" id="lx-nav-toggle" class="lx-toggle" hidden>
+
+    <a class="lx-brand" href="{% url "web:main" %}">
+      <svg class="lx-mark" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M8.2 3.5 H15.8 a1 1 0 0 1 0.95 0.7 L19.2 11 a0.7 0.7 0 0 1 -0.67 0.9 H5.47 A0.7 0.7 0 0 1 4.8 11 L7.05 4.2 a1 1 0 0 1 0.95 -0.7 Z" fill="var(--accent)"/>
+        <g stroke="#fff" stroke-width="1.1" stroke-linecap="round" opacity=".92">
+          <path d="M9.4 5.9 H14.6"/><path d="M8.7 7.6 H15.3"/><path d="M8 9.3 H16"/>
+        </g>
+        <g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 11.9 V18"/><path d="M9 20 L12 18 L15 20"/>
+        </g>
+      </svg>
+      {{ app_title }}
+    </a>
+
+    <label class="lx-hamburger" for="lx-nav-toggle" aria-label="{% trans "Menu" %}"><span></span></label>
+
+    {% if sopds_auth %}
+    <ul class="lx-account">
+      {% if user.is_authenticated %}
+        <li><a href="{% url "web:settings" %}"><i class="fi-widget"></i><span class="show-for-medium">{% trans "Settings" %}</span></a></li>
+        {% if user.is_superuser %}
+        <li><a href="{% url "admin:index" %}"><i class="fi-wrench"></i><span class="show-for-medium">{% trans "Admin" %}</span></a></li>
+        {% endif %}
+        <li><a href="{% url "web:logout" %}"><i class="fi-torsos"></i><span class="show-for-medium">{% trans "Logout" %} ({{ user.username }})</span></a></li>
+      {% else %}
+        <li><a href="{% url "web:login" %}"><i class="fi-torsos"></i><span class="show-for-medium">{% trans "Login" %}</span></a></li>
+      {% endif %}
+    </ul>
+    {% endif %}
+
+    <div class="lx-search">
+      <form method="get" action="{% url "web:searchbooks" %}" id="searchform" style="position:relative;">
+        {% csrf_token %}
+        <div class="input-group">
+          <input class="input-group-field" type="search" name="searchterms" placeholder="{% trans "Search" %}" id="main_searchbox"
+                 minlength="3" required autocomplete="off"
+                 hx-post="{% url 'web:suggest' %}"
+                 hx-trigger="keyup changed delay:300ms, search"
+                 hx-target="#search-suggestions"
+                 hx-include="closest form">
+
+          <div class="input-group-button">
+            <button class="button" type="submit" name="submit">{% trans "Search" %}</button>
+          </div>
+
+          <details class="lx-searchtype">
+            <summary aria-label="{% trans "Choose Search Type:" %}"><span class="lx-searchtype-label" id="searchtype-label">{% if searchobject == "author" %}{% trans "Author" %}{% elif searchobject == "series" %}{% trans "Series" %}{% else %}{% trans "Title" %}{% endif %}</span></summary>
+            <div class="lx-searchtype-pane">
+              <fieldset>
+                <legend>{% trans "Choose Search Type:" %}</legend>
+                <input type="radio" name="searchtype" value="m" id="title" onClick="SetSearch()" {% if searchobject == "title" or not searchobject %}checked{% endif %}><label for="title">{% trans "Title" %}</label>
+                <input type="radio" name="searchtype" value="m" id="author" onClick="SetSearch()" {% if searchobject == "author" %}checked{% endif %}><label for="author">{% trans "Author" %}</label>
+                <input type="radio" name="searchtype" value="m" id="series" onClick="SetSearch()" {% if searchobject == "series" %}checked{% endif %}><label for="series">{% trans "Series" %}</label>
+              </fieldset>
+            </div>
+          </details>
+
+          <input type="hidden" name="page" value="0">
+          <input type="hidden" name="suggesttype" id="suggesttype" value="title">
+        </div>
+
+        <div id="search-suggestions"></div>
+      </form>
+    </div>
+
+    <ul class="lx-primary">
+      <li {% if current == "catalog" %}class="active"{% endif %}><a href="{% url "web:catalog" %}">{% trans "Catalogs" %}</a></li>
+
+      {% if not alphabet %}
+        <li {% if current == "book" %}class="active"{% endif %}><a href="{% url "web:book" %}?lang=0">{% trans "Books" %}</a></li>
+        <li {% if current == "author" %}class="active"{% endif %}><a href="{% url "web:author" %}?lang=0">{% trans "Authors" %}</a></li>
+        <li {% if current == "genre" %}class="active"{% endif %}><a href="{% url "web:genre" %}">{% trans "Genres" %}</a></li>
+        <li {% if current == "series" %}class="active"{% endif %}><a href="{% url "web:series" %}?lang=0">{% trans "Series" %}</a></li>
+      {% else %}
+        <li {% if current == "book" %}class="active"{% endif %}>
+          <details class="lx-dropdown"><summary>{% trans "Books" %}</summary>
+            <ul class="lx-submenu">
+              {% for key, value in lang_menu.items %}<li><a href="{% url "web:book" %}?lang={{ key }}">{{ value }}</a></li>{% endfor %}
+            </ul>
+          </details>
+        </li>
+        <li {% if current == "author" %}class="active"{% endif %}>
+          <details class="lx-dropdown"><summary>{% trans "Authors" %}</summary>
+            <ul class="lx-submenu">
+              {% for key, value in lang_menu.items %}<li><a href="{% url "web:author" %}?lang={{ key }}">{{ value }}</a></li>{% endfor %}
+            </ul>
+          </details>
+        </li>
+        <li {% if current == "genre" %}class="active"{% endif %}><a href="{% url "web:genre" %}">{% trans "Genres" %}</a></li>
+        <li {% if current == "series" %}class="active"{% endif %}>
+          <details class="lx-dropdown"><summary>{% trans "Series" %}</summary>
+            <ul class="lx-submenu">
+              {% for key, value in lang_menu.items %}<li><a href="{% url "web:series" %}?lang={{ key }}">{{ value }}</a></li>{% endfor %}
+            </ul>
+          </details>
+        </li>
+      {% endif %}
+    </ul>
+
+  </div>
+</nav>
+
+<script>
+  function SetSearch() {
+    var searchtype = document.querySelector("input[name='searchtype']:checked");
+    searchtype = searchtype ? searchtype.id : "title";
+    document.getElementById('main_searchbox').setAttribute("placeholder", "{% trans "Search by" %} " + searchtype);
+    document.getElementById('suggesttype').value = searchtype;
+    var lbl = document.querySelector("label[for='" + searchtype + "']");
+    var lblEl = document.getElementById('searchtype-label');
+    if (lbl && lblEl) lblEl.textContent = lbl.textContent.trim();
+    var form = document.getElementById('searchform');
+    if (searchtype == "title")  form.setAttribute("action", "{% url "web:searchbooks" %}");
+    if (searchtype == "author") form.setAttribute("action", "{% url "web:searchauthors" %}");
+    if (searchtype == "series") form.setAttribute("action", "{% url "web:searchseries" %}");
+    var d = document.querySelector('.lx-searchtype');
+    if (d) d.removeAttribute('open');
+    document.getElementById('search-suggestions').innerHTML = '';
+  }
+</script>
