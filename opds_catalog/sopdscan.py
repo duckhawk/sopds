@@ -6,7 +6,7 @@ import datetime
 import logging
 import re
 
-from book_tools.format import create_bookfile
+from book_tools.format import create_bookfile, MAX_BOOK_BYTES
 from book_tools.format.util import strip_symbols
 
 from django.utils.translation import gettext as _
@@ -186,26 +186,37 @@ class opdsScanner:
         if opdsdb.arc_skip(rel_file,zsize):
             self.arch_skipped+=1
             self.logger.debug('Skip ZIP archive '+rel_file+'. Already scanned.')
-        else:                   
+        else:
             zip_process_error = 0
             try:
-                z = open_zipfile(file)
-                filelist = z.namelist()
-                cat = opdsdb.addcattree(rel_file, opdsdb.CAT_ZIP, zsize)
-                for n in filelist:
-                    try:
-                        self.logger.debug('Start process ZIP file = '+file+' book file = '+n)
-                        file_size=z.getinfo(n).file_size
-                        bookfile = z.open(n)
-                        self.processfile(n,file,bookfile,cat,opdsdb.CAT_ZIP,file_size)
-                        bookfile.close()
-                    except zipfile.BadZipFile:
-                        self.logger.warning('Error processing ZIP file = '+file+' book file = '+n)
-                        zip_process_error = 1
-                z.close()
+                with open_zipfile(file) as z:
+                    filelist = z.namelist()
+                    cat = opdsdb.addcattree(rel_file, opdsdb.CAT_ZIP, zsize)
+                    for n in filelist:
+                        try:
+                            self.logger.debug('Start process ZIP file = '+file+' book file = '+n)
+                            file_size=z.getinfo(n).file_size
+                            # Skip decompression bombs: a member declaring more
+                            # than the cap is not a real book.
+                            if file_size > MAX_BOOK_BYTES:
+                                self.logger.warning('Skip oversized ZIP member %s in %s (%d bytes)' % (n, file, file_size))
+                                continue
+                            with z.open(n) as bookfile:
+                                self.processfile(n,file,bookfile,cat,opdsdb.CAT_ZIP,file_size)
+                        except zipfile.BadZipFile:
+                            self.logger.warning('Error processing ZIP file = '+file+' book file = '+n)
+                            zip_process_error = 1
+                        except Exception:
+                            # A single unreadable member (encrypted, unsupported
+                            # compression, oversized) must not abort the archive.
+                            self.logger.exception('Error processing ZIP member %s in %s' % (n, file))
+                            zip_process_error = 1
                 self.arch_scanned+=1
             except zipfile.BadZipFile:
                 self.logger.warning('Error while read ZIP archive. File '+file+' corrupt.')
+                zip_process_error = 1
+            except Exception:
+                self.logger.exception('Error while read ZIP archive %s' % file)
                 zip_process_error = 1
             self.bad_archives+=zip_process_error
 

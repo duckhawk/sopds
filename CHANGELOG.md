@@ -42,6 +42,10 @@ All notable changes to this project are documented here. The format is based on
   directory (path traversal). First test coverage for the INPX parser.
 - OPDS Basic-auth no longer creates a persistent session on every request, so
   the `django_session` table stops growing under e-reader polling.
+- **Security:** decompression-bomb guard — book reads are capped at
+  `MAX_BOOK_BYTES` and zip members declaring more than the cap are skipped
+  instead of decompressed. `processzip` also releases handles via `with` and
+  no longer lets one unreadable archive member abort the archive.
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound

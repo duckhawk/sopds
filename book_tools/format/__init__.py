@@ -17,6 +17,28 @@ from constance import config
 
 FB2_ROOT = 'FictionBook'
 
+# Upper bound on how many bytes we will decompress/buffer for one book. Real
+# fb2/epub/mobi books are far smaller; the cap exists to stop decompression
+# bombs (a tiny archive that inflates to many GB) from OOM-killing the scanner
+# or a cover request. Applied to the outer read and to declared zip member
+# sizes.
+MAX_BOOK_BYTES = 256 * 1024 * 1024
+
+
+class BookTooLarge(Exception):
+    """Raised when a book file / archive exceeds MAX_BOOK_BYTES."""
+
+
+def _zip_within_cap(zip_file):
+    """True if the archive's total declared uncompressed size is within cap.
+
+    zipfile verifies each member's real length/CRC on read, so a header that
+    lies about being small still can't decompress past its declared size
+    without raising BadZipFile — checking the declared sizes is a sound bomb
+    guard and avoids decompressing anything.
+    """
+    return sum(info.file_size for info in zip_file.infolist()) <= MAX_BOOK_BYTES
+
 class mime_detector:
     @staticmethod
     def fmt(fmt):
@@ -57,7 +79,7 @@ def detect_mime(file, original_filename):
                 return Mimetype.FB2
         elif mime == Mimetype.ZIP:
             with zipfile.ZipFile(file) as zip_file:
-                if not zip_file.testzip():
+                if _zip_within_cap(zip_file) and not zip_file.testzip():
                     infolist = list_zip_file_infos(zip_file)
                     if len(infolist) == 1:
                         if FB2_ROOT == __xml_root_tag(zip_file.open(infolist[0])):
@@ -82,7 +104,12 @@ def detect_mime(file, original_filename):
 def create_bookfile(file, original_filename):
     if isinstance(file, str):
         file = open(file, 'rb')
-    file = BytesIO(file.read())
+    # Cap the outer read so a single oversized file / archive can't buffer an
+    # unbounded amount into memory (read one byte past the cap to detect it).
+    data = file.read(MAX_BOOK_BYTES + 1)
+    if len(data) > MAX_BOOK_BYTES:
+        raise BookTooLarge('%s exceeds %d bytes' % (original_filename, MAX_BOOK_BYTES))
+    file = BytesIO(data)
     mimetype = detect_mime(file,original_filename)
     if mimetype == Mimetype.EPUB:
         return EPub(file, original_filename)
@@ -126,7 +153,7 @@ def __sniff_content(file):
         try:
             file.seek(0)
             with zipfile.ZipFile(file) as zip_file:
-                if not zip_file.testzip():
+                if _zip_within_cap(zip_file) and not zip_file.testzip():
                     infolist = list_zip_file_infos(zip_file)
                     if len(infolist) == 1:
                         if FB2_ROOT == __xml_root_tag(zip_file.open(infolist[0])):
