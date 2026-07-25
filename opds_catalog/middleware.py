@@ -64,8 +64,11 @@ class BasicAuthMiddleware(object):
                 user = oidc.authenticate_password(username, password)
 
         if user and user.is_active:
+            # OPDS clients (e-readers) re-send Basic auth on every request. Do
+            # NOT auth.login() here: that created and persisted a new session
+            # row per request, growing django_session without bound. Setting
+            # request.user is all the feed/download views behind this need.
             request.user = user
-            auth.login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             return request
 
         return self.unauthed()

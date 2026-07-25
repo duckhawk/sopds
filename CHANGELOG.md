@@ -40,6 +40,8 @@ All notable changes to this project are documented here. The format is based on
   cp1251 collection no longer aborts the scan), zip/INP handles are closed via
   `with`, and an untrusted `FOLDER` value can no longer escape the collection
   directory (path traversal). First test coverage for the INPX parser.
+- OPDS Basic-auth no longer creates a persistent session on every request, so
+  the `django_session` table stops growing under e-reader polling.
 
 ### Security
 - Regression test locking in that `alphabet_menu()` passes user input as bound
