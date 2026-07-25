@@ -43,8 +43,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',    
     'opds_catalog',
-    'sopds_web_backend',    
-    'django.contrib.admin',   
+    'sopds_web_backend',
+    'sopds_sync',
+    'django.contrib.admin',
     'django.contrib.staticfiles',     
     'constance.backends.database',
     'constance',
@@ -309,6 +310,11 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_OIDC_SCOPES', ('openid email profile', _('OIDC scopes (space-separated)'))),
     ('SOPDS_OIDC_BUTTON_TEXT', ('Log in with Keycloak', _('Text on the OIDC login button'))),
 
+    ('SOPDS_KOSYNC_ENABLE', (False, _('Enable the KOReader (kosync) progress-sync API under /kosync/'))),
+    ('SOPDS_KOSYNC_ALLOW_REGISTER', (False, _('Allow KOReader self-registration via /users/create (otherwise provision the sync password from the web UI)'))),
+    ('SOPDS_WEBDAV_ENABLE', (False, _('Enable the Moon+ Reader WebDAV sync endpoint under /dav/'))),
+    ('SOPDS_WEBDAV_ROOT', (os.path.join(BASE_DIR, 'webdav_data'), _('Absolute path to the per-user WebDAV storage directory'))),
+
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -320,6 +326,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     '6. Converters Options': ('SOPDS_FB2TOEPUB', 'SOPDS_FB2TOMOBI', 'SOPDS_TEMP_DIR'),
     '7. Log & PID Files': ('SOPDS_SERVER_LOG', 'SOPDS_SCANNER_LOG', 'SOPDS_TELEBOT_LOG','SOPDS_SERVER_PID','SOPDS_SCANNER_PID','SOPDS_TELEBOT_PID'),
     '8. OIDC (Keycloak)': ('SOPDS_OIDC_ENABLE', 'SOPDS_OIDC_ISSUER', 'SOPDS_OIDC_CLIENT_ID', 'SOPDS_OIDC_CLIENT_SECRET', 'SOPDS_OIDC_SCOPES', 'SOPDS_OIDC_BUTTON_TEXT'),
+    '9. Reading Progress Sync': ('SOPDS_KOSYNC_ENABLE', 'SOPDS_KOSYNC_ALLOW_REGISTER', 'SOPDS_WEBDAV_ENABLE', 'SOPDS_WEBDAV_ROOT'),
 }
 
 

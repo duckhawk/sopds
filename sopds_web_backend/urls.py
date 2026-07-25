@@ -17,6 +17,7 @@ urlpatterns = [
     re_path(r'^series/$',views.SeriesView, name='series'),
     re_path(r'^theme/$',views.ThemeView, name='theme'),
     re_path(r'^settings/$',views.SettingsView, name='settings'),
+    re_path(r'^sync/$',views.DeviceSyncView, name='devicesync'),
     re_path(r'^login/$',views.LoginView, name='login'),
     re_path(r'^oidc/login/$',views.OIDCLoginView, name='oidc_login'),
     re_path(r'^oidc/callback/$',views.OIDCCallbackView, name='oidc_callback'),

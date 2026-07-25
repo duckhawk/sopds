@@ -397,6 +397,48 @@ def SettingsView(request):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+def DeviceSyncView(request):
+    """Set the KOReader sync password and show connection details for KOReader
+    (kosync) and Moon+ Reader (WebDAV).
+
+    Moon+ Reader's WebDAV uses the normal SOPDS/OIDC login, so nothing is stored
+    here for it. KOReader can't use that password (it only sends md5), so the
+    user sets a dedicated sync password whose md5 is kept in KosyncCredential.
+    """
+    from sopds_sync.models import KosyncCredential
+    message = None
+    if request.method == 'POST':
+        if request.POST.get('action') == 'clear':
+            KosyncCredential.objects.filter(user=request.user).delete()
+            message = _('Sync password removed.')
+        else:
+            pw = (request.POST.get('sync_password') or '').strip()
+            if len(pw) < 6:
+                message = _('Sync password must be at least 6 characters long.')
+            else:
+                cred, created = KosyncCredential.objects.get_or_create(
+                    user=request.user, defaults={'auth_key': ''})
+                cred.set_password(pw)
+                cred.save(update_fields=['auth_key'])
+                message = _('Sync password saved.')
+
+    args = {
+        'current': 'devicesync',
+        'breadcrumbs': [_('Device sync')],
+        'message': message,
+        'has_cred': KosyncCredential.objects.filter(user=request.user).exists(),
+        'kosync_enabled': config.SOPDS_KOSYNC_ENABLE,
+        'webdav_enabled': config.SOPDS_WEBDAV_ENABLE,
+        'kosync_url': request.build_absolute_uri('/kosync/'),
+        'webdav_url': request.build_absolute_uri('/dav/'),
+        'css_file': theme_css(request.user),
+    }
+    args.update(csrf(request))
+    return render(request, 'sopds_devicesync.html', args)
+
+
+@vary_on_headers("HTTP_ACCEPT_LANGUAGE")
+@sopds_login(url='web:login')
 def SearchSeriesView(request):
     #Read searchtype, searchterms, searchterms0, page from form
     args = {}
