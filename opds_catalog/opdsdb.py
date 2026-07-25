@@ -54,6 +54,24 @@ def pg_optimize(verbose=False):
         cursor.execute('VACUUM FULL opds_catalog_book')
         print('PostgreSql tables internal structure optimized...')
 
+def vacuum_analyze(verbose=False):
+    """VACUUM ANALYZE the large catalog tables (PostgreSQL only).
+
+    Run after a scan: the full-table ``avail`` sweep churns every row, so
+    without this the tables accumulate dead tuples and a stale visibility map
+    until autovacuum catches up, during which the alphabet menu loses its
+    Index-Only Scan and slows to tens of seconds. VACUUM (not FULL) is
+    non-blocking. Safe to skip on non-PostgreSQL backends.
+    """
+    if connection.vendor != 'postgresql':
+        return
+    with connection.cursor() as cursor:
+        for table in ('opds_catalog_book', 'opds_catalog_author', 'opds_catalog_series'):
+            if verbose:
+                print('VACUUM (ANALYZE) %s ...' % table)
+            cursor.execute('VACUUM (ANALYZE) %s' % table)
+
+
 def clear_all(verbose=False):
     cursor = connection.cursor()
     cursor.execute('delete from opds_catalog_bseries')
