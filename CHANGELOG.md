@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - htmx live-search suggestions in the header search box (title/author/series),
   as progressive enhancement.
+- Title suggestions now show the book's first author next to the title, so
+  same-/similar-titled books are distinguishable.
 - pytest / pytest-django test suite with coverage; GitHub Actions CI running
   the suite on Python 3.12, plus a non-blocking `ruff` lint pass.
 - Tooling config in `pyproject.toml` (ruff, mypy); `CONTRIBUTING.md`.
