@@ -13,6 +13,13 @@ All notable changes to this project are documented here. The format is based on
 - Tooling config in `pyproject.toml` (ruff, mypy); `CONTRIBUTING.md`.
 
 ### Changed
+- Incremental scan no longer rewrites the whole `Book` table on every run. The
+  start-of-scan `UPDATE opds_catalog_book SET avail=1` full-table sweep is
+  replaced by a scratch `ScanSeen` table: the scanner records the id of each
+  book it re-finds or adds, and the post-walk pass deletes only the books not
+  seen (anti-join). Unchanged books are never rewritten — no bloat and no
+  read-slowdown during a scan — and the sweep refuses to run if the seen set is
+  empty (never wipes a non-empty catalogue). Adds migration `0017`.
 - Upgraded to Django 5.2 LTS (Python 3.13 / PostgreSQL supported).
 - Test dependencies are constrained by `requirements.txt` (`requirements-test.txt`
   uses `-c`), so the test environment never drifts from production.

@@ -84,7 +84,7 @@ class opdsScanner:
         self.zip_file = None
         self.rel_path = None     
                     
-        opdsdb.avail_check_prepare()
+        opdsdb.scan_begin()
             
         # followlinks=True is kept so symlinked book directories are scanned,
         # but a symlink cycle would otherwise recurse forever (os.walk docs).
@@ -121,15 +121,11 @@ class opdsScanner:
                         file_size=os.path.getsize(file)
                         self.processfile(name,full_path,file,None,0,file_size)
 
-        #if config.SOPDS_DELETE_LOGICAL:
-        #    self.books_deleted=opdsdb.books_del_logical()
-        #else:
-        #    self.books_deleted=opdsdb.books_del_phisical()
-            
-        # Keep the delete-sweep atomic on its own: it removes every book not
-        # re-marked avail=2 by this scan, and must be all-or-nothing.
+        # Delete-sweep: remove (or, in logical mode, mark avail=0) every book
+        # not recorded as seen during this scan. Kept atomic on its own, and
+        # guarded against wiping the catalogue on an empty seen set.
         with transaction.atomic():
-            self.books_deleted=opdsdb.books_del_phisical()
+            self.books_deleted = opdsdb.scan_finish(logical=config.SOPDS_DELETE_LOGICAL)
 
         self.log_stats()
 

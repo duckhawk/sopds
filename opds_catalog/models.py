@@ -173,3 +173,19 @@ class Counter(models.Model):
     update_time = models.DateTimeField(null=False, default=timezone.now)
     obj = models.Manager()
     objects = CounterManager()
+
+
+class ScanSeen(models.Model):
+    """Scratch list of book ids seen during the current library scan.
+
+    Replaces the old full-table `avail=1` flip: the scanner records here each
+    book it re-finds or adds, and the post-walk sweep deletes the books NOT
+    listed (anti-join). It is a plain id column, not a ForeignKey, so recording
+    an id is cheap and never rewrites the (large) Book table; rows are cleared
+    at the start of every scan. Access is serialized by the scanner's advisory
+    lock, so a single shared table is safe.
+    """
+    book_id = models.BigIntegerField(primary_key=True)
+
+    class Meta:
+        db_table = 'opds_catalog_scan_seen'
