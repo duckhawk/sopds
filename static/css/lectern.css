@@ -49,6 +49,7 @@
   --font: ui-sans-serif, system-ui, 'Helvetica Neue', Helvetica, Roboto, Arial, sans-serif;
   --maxw: 1200px;
   --gutter: .9375rem;
+  --field-h: 2.5rem;   /* search input / button / scope toggle share this height */
 }
 
 :root[data-theme="dark"] {
@@ -351,11 +352,13 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1.25rem 0; }
    -------------------------------------------------------------------------- */
 .lx-search { position: relative; flex: 1 1 16rem; min-width: 12rem; }
 .lx-search form { margin: 0; }
+/* The input sets the height; the button and scope toggle stretch to match it,
+   so the three fields always line up (no per-element fixed heights to drift). */
 .input-group { display: flex; align-items: stretch; margin: 0; }
 .input-group-field {
   flex: 1 1 auto;
   min-width: 0;
-  height: 2.5rem;
+  height: var(--field-h);
   padding: 0 .9rem;
   border: 1px solid var(--border-strong);
   border-right: none;
@@ -368,37 +371,48 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1.25rem 0; }
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+  position: relative;   /* keep the focus ring above the adjacent button */
+  z-index: 1;
 }
 .input-group-button { display: flex; }
-.input-group-button .button { margin: 0; height: 2.5rem; border-radius: 0; }
-.input-group-button:last-child .button { border-radius: 0 var(--radius-pill) var(--radius-pill) 0; }
-.input-group .button.arrow-only { padding: 0 .8rem; }
-.input-group .button.arrow-only::after {
-  content: "";
-  width: .45em; height: .45em;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
-  display: inline-block;
-  margin-top: -.2em;
-}
-
-/* Search-type selector (title/author/series) as native <details> panel */
-.lx-searchtype { position: static; }
-.lx-searchtype > summary {
-  list-style: none;
-  height: 2.5rem;
+.input-group-button .button {
+  margin: 0;
+  border-radius: 0;
+  padding: 0 1.1rem;
   display: inline-flex;
   align-items: center;
-  padding: 0 .85rem;
-  border: 1px solid var(--border-strong);
-  border-left: none;
+  white-space: nowrap;
+}
+
+/* Search-type toggle (title/author/series) — native <details> panel */
+.lx-searchtype { display: flex; }
+.lx-searchtype > summary {
+  list-style: none;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: 0 .8rem;
+  border: 1px solid var(--accent);
+  border-left: 1px solid rgba(255, 255, 255, .3);
   border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
   background: var(--accent);
   color: var(--accent-contrast);
+  font-size: .9rem;
+  white-space: nowrap;
   cursor: pointer;
 }
 .lx-searchtype > summary::-webkit-details-marker { display: none; }
+.lx-searchtype > summary::after {
+  content: "";
+  width: .5em; height: .5em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-.12em);
+  opacity: .9;
+}
+.lx-searchtype[open] > summary::after { transform: rotate(-135deg) translateY(.06em); }
+.lx-searchtype-label { font-weight: 600; }
 .lx-searchtype-pane {
   position: absolute;
   right: 0;

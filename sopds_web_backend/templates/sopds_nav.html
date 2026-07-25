@@ -51,7 +51,7 @@
           </div>
 
           <details class="lx-searchtype">
-            <summary aria-label="{% trans "Choose Search Type:" %}"></summary>
+            <summary aria-label="{% trans "Choose Search Type:" %}"><span class="lx-searchtype-label" id="searchtype-label">{% if searchobject == "author" %}{% trans "Author" %}{% elif searchobject == "series" %}{% trans "Series" %}{% else %}{% trans "Title" %}{% endif %}</span></summary>
             <div class="lx-searchtype-pane">
               <fieldset>
                 <legend>{% trans "Choose Search Type:" %}</legend>
@@ -113,6 +113,9 @@
     searchtype = searchtype ? searchtype.id : "title";
     document.getElementById('main_searchbox').setAttribute("placeholder", "{% trans "Search by" %} " + searchtype);
     document.getElementById('suggesttype').value = searchtype;
+    var lbl = document.querySelector("label[for='" + searchtype + "']");
+    var lblEl = document.getElementById('searchtype-label');
+    if (lbl && lblEl) lblEl.textContent = lbl.textContent.trim();
     var form = document.getElementById('searchform');
     if (searchtype == "title")  form.setAttribute("action", "{% url "web:searchbooks" %}");
     if (searchtype == "author") form.setAttribute("action", "{% url "web:searchauthors" %}");
