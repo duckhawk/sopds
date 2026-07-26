@@ -1,4 +1,67 @@
-assets/* linguist-vendored
-convert/* linguist-vendored
-static/* linguist-vendored
-sopds_web_backend/static/* linguist-vendored
+# Store every text file with LF endings in the repository.
+#
+# Without this the endings of a file were whatever the editor that last touched
+# it produced, and the tree drifted: most of it was LF while a handful of the
+# original upstream modules (opds_catalog/feeds.py, models.py, urls.py, ...)
+# stayed CRLF. A routine one-line edit made with a tool that writes LF then
+# rewrote the whole file, turning a 20-line change into a 1000-line diff and an
+# unmergeable conflict. `text=auto` makes git normalise on the way in and leaves
+# checkout to the platform, so a Windows working tree still gets CRLF if
+# core.autocrlf asks for it.
+* text=auto
+
+# Source types are declared text rather than left to `text=auto`, whose
+# heuristic counts every non-ASCII byte as non-printable and calls a file binary
+# once they outweigh the printable ones by 1%. opds_catalog/utils.py is mostly
+# cyrillic transliteration tables and tripped exactly that: git refused to
+# normalise it and rendered its diffs as "Binary files differ".
+*.py    text
+*.html  text
+*.css   text
+*.js    text
+*.json  text
+*.md    text
+*.rst   text
+*.txt   text
+*.po    text
+*.pot   text
+*.xsl   text
+*.xml   text
+*.yml   text
+*.yaml  text
+*.toml  text
+*.ini   text
+*.cfg   text
+
+# Payloads git must not touch. Most of these it would detect on its own, but
+# compiled catalogs and book fixtures are the ones a wrong guess would silently
+# corrupt, so they are declared rather than sniffed.
+*.epub binary
+*.mobi binary
+*.djvu binary
+*.pdf  binary
+*.mo   binary
+*.zip  binary
+*.fb2  binary
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.ico  binary
+*.psd  binary
+*.woff binary
+*.ttf  binary
+*.sqlite3 binary
+
+# Batch files are read by cmd.exe, which needs CRLF.
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+# Bundled third-party assets: kept out of the language statistics and left
+# byte-for-byte as upstream shipped them, so `-text` disables normalisation
+# rather than rewriting a few hundred vendored files we do not maintain.
+# `**` because a gitattributes `*` does not cross a directory separator — the
+# previous `static/*` only ever matched the files directly under static/.
+assets/** linguist-vendored -text
+convert/** linguist-vendored -text
+static/** linguist-vendored -text
+sopds_web_backend/static/** linguist-vendored -text
