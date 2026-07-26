@@ -19,6 +19,7 @@ from opds_catalog import models
 from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalog, Genre, lang_menu, Theme
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
+from book_tools.format.util import normalize_isbn
 from constance import config
 from sopds_web_backend import oidc
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
@@ -176,12 +177,27 @@ def SearchBooksView(request):
         #    args['errormsg'] = 'Too few symbols in search string !';
         #    return render_to_response('sopds_error.html', args)
         
+        # Pasting an ISBN into the (title) search box should find the book, not
+        # nothing: when the term is a checksum-valid ISBN, search that field.
+        # A title never normalises to a valid ISBN, so this cannot shadow a real
+        # title search.
+        if searchtype == 'm' and normalize_isbn(searchterms):
+            searchtype = 'x'
+
         if searchtype == 'm':
             #books = Book.objects.extra(where=["upper(title) like %s"], params=["%%%s%%"%searchterms.upper()]).order_by('title','-docdate')
             books = Book.objects.filter(search_title__contains=searchterms.upper()).order_by('search_title','-docdate')
             args['breadcrumbs'] = [_('Books'),_('Search by title'),searchterms]
             args['searchobject'] = 'title'
-            
+
+        # Поиск книг по ISBN
+        elif searchtype == 'x':
+            isbn = normalize_isbn(searchterms)
+            books = (Book.objects.filter(isbn=isbn) if isbn else Book.objects.none())
+            books = books.order_by('search_title', '-docdate')
+            args['breadcrumbs'] = [_('Books'), _('Search by ISBN'), isbn or searchterms]
+            args['searchobject'] = 'title'
+
         if searchtype == 'b':
             #books = Book.objects.extra(where=["upper(title) like %s"], params=["%s%%"%searchterms.upper()]).order_by('title','-docdate')
             books = Book.objects.filter(search_title__startswith=searchterms.upper()).order_by('search_title','-docdate')
@@ -335,6 +351,7 @@ def SearchBooksView(request):
                  'docdate': row.docdate,
                  'format': row.format,
                  'title': row.title,
+                 'isbn': row.isbn,
                  'filesize': row.filesize // 1000,
                  'authors': row.authors.all(),
                  'genres': row.genres.all(),

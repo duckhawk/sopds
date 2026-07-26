@@ -458,6 +458,14 @@ msgstr "По главам"
 msgid "Reader font size"
 msgstr "Размер шрифта"
 
+#: templates/sopds_books.html:72 views.py:162
+msgid "ISBN:"
+msgstr "ISBN:"
+
+#: views.py:161
+msgid "Search by ISBN"
+msgstr "Поиск по ISBN"
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"

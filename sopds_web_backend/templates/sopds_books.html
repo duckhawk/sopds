@@ -71,6 +71,10 @@
 				   <b>{% trans "Series:" %}</b> {% for s in b.series %} <a href="{% url "web:searchbooks" %}?searchtype=s&searchterms={{s.id}}">{{s.ser}}</a>{% if not forloop.last %},{%endif%} {%endfor%} <br>
                    <b>{% trans "No in Series:" %}</b> {% for s in b.ser_no %}{{s.ser_no}}{% if not forloop.last %},{%endif%} {%endfor%} <br>
 				{% endif %}
+				{% if b.isbn %}
+				   {# Links to the ISBN search, which finds the other editions of the same book. #}
+				   <b>{% trans "ISBN:" %}</b> <a href="{% url "web:searchbooks" %}?searchtype=x&searchterms={{b.isbn}}">{{ b.isbn }}</a> <br>
+				{% endif %}
 				<b>{% trans "File:" %}</b> {{ b.path }}/{{ b.filename }} <br>
 				<b>{% trans "File size:" %}</b> {{ b.filesize }}Кб.<br>
 				<b>{% trans "Changes date:" %}</b> {{ b.docdate }} <br>	

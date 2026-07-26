@@ -13,6 +13,13 @@ All notable changes to this project are documented here. The format is based on
   ordered by registration date, newest first. Migration `0020` adds the
   matching `(registerdate DESC, id DESC)` index so paging through a large
   catalogue reads the order off the index instead of sorting the table.
+- **Search by ISBN.** The ISBN extracted during the scan was stored and then
+  never used — it was neither shown nor searchable. It is now a search type of
+  its own (`x`) in both the web UI and OPDS, offered in the OPDS search menu
+  when the term is actually an ISBN, and shown on the book card as a link that
+  finds the other editions of the same book. Pasting an ISBN into the ordinary
+  title box searches the ISBN instead of coming back empty; terms are
+  normalised, so hyphenated, spaced and `ISBN`-prefixed forms all work.
   Russian translations included.
 - htmx live-search suggestions in the header search box (title/author/series),
   as progressive enhancement.
