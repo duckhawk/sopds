@@ -89,6 +89,11 @@ class opdsFeed(Atom1Feed):
         if self.feed.get('searchTerm_url') is not None:
             handler.addQuickElement('link', None, {"href":self.feed["searchTerm_url"],"rel":"search","type":"application/atom+xml"})
             handler.characters("\n")
+        if self.feed.get('opds2_url') is not None:
+            # An "alternate" pointing at the same catalogue in OPDS 2.0, so a
+            # client that prefers JSON can switch without being told the URL.
+            handler.addQuickElement('link', None, {"href":self.feed["opds2_url"],"rel":"alternate","type":"application/opds+json"})
+            handler.characters("\n")
 
 
     def add_item_elements(self, handler, item):        
@@ -162,6 +167,7 @@ class MainFeed(AuthFeed):
                 #"searchTerm_url":reverse("opds_catalog:searchtypes",kwargs={"searchterms":"{searchTerms}"}),
                 "start_url":reverse("opds_catalog:main"),
                 "description_mime_type":"text",
+                "opds2_url":reverse("opds_catalog:opds2_root"),
         }
 
     def items(self):
