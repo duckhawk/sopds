@@ -465,6 +465,9 @@ msgstr "ISBN:"
 #: views.py:161
 msgid "Search by ISBN"
 msgstr "Поиск по ISBN"
+#: templates/sopds_books.html:72
+msgid "Publisher:"
+msgstr "Издательство:"
 
 #: views.py:146 views.py:152
 msgid "Search by title"
