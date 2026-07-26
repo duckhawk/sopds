@@ -515,6 +515,30 @@ msgstr "Все"
 msgid "Genre"
 msgstr "Жанр"
 
+#: templates/sopds_books.html:56 templates/sopds_settings.html:33
+msgid "Send to device"
+msgstr "Отправить на устройство"
+
+#: templates/sopds_settings.html:35
+msgid "Address of your reading device"
+msgstr "Адрес вашей читалки"
+
+#: templates/sopds_books.html:171
+msgid "Sent to"
+msgstr "Отправлено на"
+
+#: templates/sopds_books.html:172
+msgid "Could not send the book."
+msgstr "Не удалось отправить книгу."
+
+#: templates/sopds_login.html:20
+msgid "Forgot your password?"
+msgstr "Забыли пароль?"
+
+#: templates/sopds_login.html:21 templates/sopds_register.html:3
+msgid "Create an account"
+msgstr "Создать учётную запись"
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"

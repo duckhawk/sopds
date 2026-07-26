@@ -53,6 +53,9 @@
 			   {# The in-browser reader handles FB2 and EPUB; other formats 404. #}
 			   <i><a href="{% url 'web:read' b.id %}"><span class="label small">{% trans "Read" %}</span></a></i>&nbsp;
 			{% endif %}
+			{% if b.sendable %}
+			   <i><a href="#" onclick="sendToDevice({{ b.id }});return false;"><span class="label small">{% trans "Send to device" %}</span></a></i>&nbsp;
+			{% endif %}
 			{% if b.bookshelf %}
 			&nbsp;&nbsp;<i><a href="#"
 			      hx-delete="{% url 'web:bsdel' %}?book={{ b.id }}"
@@ -196,6 +199,17 @@
 			if (res && res.ok){ c.setAttribute('data-rating', res.rating || 0); bsRenderStars(c); }
 		});
 	}
+	var SEND_URL = "{% url 'web:send_to_device' 0 %}";
+
+	function sendToDevice(id){
+		bsPost(SEND_URL.replace('/0/', '/' + id + '/'), {}, function(res){
+			// The server's message is already translated and safe to show as-is.
+			alert(res && res.ok
+				? "{% trans "Sent to" %} " + res.address
+				: (res && res.error) || "{% trans "Could not send the book." %}");
+		});
+	}
+
 	document.addEventListener('DOMContentLoaded', function(){
 		document.querySelectorAll('.bs-stars').forEach(bsRenderStars);
 	});

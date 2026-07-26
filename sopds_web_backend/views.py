@@ -22,7 +22,7 @@ from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalo
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
-from opds_catalog import dl, ratings, stats, throttle
+from opds_catalog import delivery, dl, ratings, stats, throttle
 from constance import config
 from sopds_web_backend import oidc
 from sopds import email as mail
@@ -372,6 +372,9 @@ def SearchBooksView(request):
         # One query for the whole page, keyed on ids we already have.
         page_ratings = ratings.summary(r.id for r in page_rows)
         page_stats = stats.summary(r.id for r in page_rows)
+        # One check for the page, not one per book: it depends on the reader
+        # and the server, never on the book.
+        can_send = delivery.can_send(request.user)
 
         for row in page_rows:
             user_shelf = getattr(row, 'user_shelf', []) if config.SOPDS_AUTH else []
@@ -400,6 +403,7 @@ def SearchBooksView(request):
                  'rating_all': page_ratings.get(row.id),
                  'stat': page_stats.get(row.id),
                  'readable': row.format in dl.READABLE_FORMATS,
+                 'sendable': can_send,
                  # Percentage read, as reported by an e-reader over kosync.
                  'percent': user_shelf[0].percent if user_shelf else None
                  }
@@ -483,6 +487,7 @@ def SettingsView(request):
         except (TypeError, ValueError):
             fs = 100
         prefs.font_size = min(200, max(70, fs))
+        prefs.device_email = (request.POST.get('device_email') or '').strip()[:254]
         prefs.save()
         return redirect(reverse('web:settings'))
 
@@ -492,6 +497,8 @@ def SettingsView(request):
         'prefs': prefs,
         'is_dark': prefs.theme_css == 'css/sopds-dark.css',
         'css_file': prefs.theme_css,
+        # Offering the field when nothing can send is just a place to type into.
+        'mail_configured': mail.is_configured(),
     }
     args.update(csrf(request))
     return render(request, 'sopds_settings.html', args)
@@ -974,6 +981,32 @@ def BSSetStatus(request, book_id):
     obj.status = status
     obj.save(update_fields=['status'])
     return JsonResponse({'ok': True, 'status': status})
+
+
+@sopds_login(url='web:login')
+@personal_view
+def SendToDevice(request, book_id):
+    """Mail this book to the address the reader configured.
+
+    POST only: it sends a message, so it must not be reachable by a link a page
+    can be tricked into following.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': str(_('Method not allowed'))}, status=405)
+
+    book = get_object_or_404(Book, id=book_id)
+    # Sending mail on demand is the most abusable thing here, so it counts
+    # against the same budget as downloading the book would.
+    if throttle.over_limit(request):
+        return JsonResponse({'ok': False, 'error': str(_('Too many requests'))}, status=429)
+
+    try:
+        address = delivery.send(request.user, book)
+    except delivery.DeliveryError as err:
+        return JsonResponse({'ok': False, 'error': str(err)}, status=400)
+
+    stats.record(book.id, stats.DOWNLOADS)
+    return JsonResponse({'ok': True, 'address': address})
 
 
 @sopds_login(url='web:login')

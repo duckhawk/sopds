@@ -46,6 +46,7 @@ urlpatterns = [
     re_path(r'^bs/clear/$', views.BSClearView, name='bsclear'),
     re_path(r'^bs/status/(?P<book_id>[0-9]+)/$', views.BSSetStatus, name='bsstatus'),
     re_path(r'^bs/rating/(?P<book_id>[0-9]+)/$', views.BSSetRating, name='bsrating'),
+    re_path(r'^send/(?P<book_id>[0-9]+)/$', views.SendToDevice, name='send_to_device'),
     re_path(r'^bs/setpos/(?P<book_id>[0-9]+)/$', views.BSSetPos, name='setpos'),
     re_path(r'^bs/getpos/(?P<book_id>[0-9]+)/$', views.BSGetPos, name='getpos'),
     re_path(r'^$',views.hello, name='main'),

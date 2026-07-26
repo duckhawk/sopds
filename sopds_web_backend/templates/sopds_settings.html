@@ -25,6 +25,19 @@
 			       oninput="document.getElementById('fs_val').textContent=this.value;">
 		</fieldset>
 
+		{% if mail_configured %}
+		<fieldset class="fieldset">
+			<legend>{% trans "Send to device" %}</legend>
+			<label>{% trans "Address of your reading device" %}
+				<input type="email" name="device_email" value="{{ prefs.device_email }}"
+				       placeholder="yourname@kindle.com">
+			</label>
+			<p class="help-text" style="font-size:80%;opacity:.8;">
+			{% blocktrans %}Books you send will arrive here. For a Kindle, add this library's sending address to your approved senders list at Amazon, or the message will be discarded.{% endblocktrans %}
+			</p>
+		</fieldset>
+		{% endif %}
+
 		<button type="submit" class="button">{% trans "Save" %}</button>
 	</form>
 
