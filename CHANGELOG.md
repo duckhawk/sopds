@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Ratings are aggregated across readers.** `bookshelf.rating` had been
+  collected per user for a while but only ever read back to redraw that same
+  user's own stars: nobody could see what the library as a whole thought of a
+  book, and nothing could be ordered by it. The book card and the OPDS entry
+  now show the average and the number of votes next to your own stars, and a
+  **Top rated** listing (search type `r`) joins *Recently added* in the OPDS
+  root feed and the web navigation. Unrated books are left out of it rather
+  than sorted as zeroes, and the vote count breaks a tie on the average, so a
+  book five people rated 5 outranks one a single person did. The aggregate is
+  one extra query per page keyed on the ids already in hand, so it does not
+  perturb the three different ways the book list is assembled. Russian
+  translations included, with plural forms.
 - **Recently added** listing — the "what's new" entry point the catalogue was
   missing. It is the first item of the OPDS root feed (`/opds/search/books/n/0/`,
   search type `n`) and the first item of the web navigation

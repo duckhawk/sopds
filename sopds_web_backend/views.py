@@ -20,6 +20,7 @@ from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalo
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
+from opds_catalog import ratings
 from constance import config
 from sopds_web_backend import oidc
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
@@ -250,6 +251,12 @@ def SearchBooksView(request):
             args['breadcrumbs'] = [_('Books'), _('Recently added')]
             args['searchobject'] = 'title'
 
+        # Книги с лучшей оценкой сообщества (searchterms не используется)
+        elif searchtype == 'r':
+            books = ratings.top_rated()
+            args['breadcrumbs'] = [_('Books'), _('Top rated')]
+            args['searchobject'] = 'title'
+
         # Поиск книг на книжной полке
         elif searchtype == 'u':
             if config.SOPDS_AUTH:
@@ -339,6 +346,9 @@ def SearchBooksView(request):
         else:
             page_rows = books.prefetch_related(*prefetch)[start:finish+1]
 
+        # One query for the whole page, keyed on ids we already have.
+        page_ratings = ratings.summary(r.id for r in page_rows)
+
         for row in page_rows:
             user_shelf = getattr(row, 'user_shelf', []) if config.SOPDS_AUTH else []
             p = {'doubles': 0,
@@ -362,6 +372,8 @@ def SearchBooksView(request):
                  'readtime': user_shelf if config.SOPDS_AUTH else None,
                  'status': user_shelf[0].status if user_shelf else '',
                  'rating': user_shelf[0].rating if user_shelf else None,
+                 # The user's own star count, and what everyone else made of it.
+                 'rating_all': page_ratings.get(row.id),
                  # Percentage read, as reported by an e-reader over kosync.
                  'percent': user_shelf[0].percent if user_shelf else None
                  }

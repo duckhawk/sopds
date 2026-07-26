@@ -30,8 +30,8 @@ urlpatterns = [
     re_path(r'^search/$',feeds.OpenSearch, name='opensearch'),
     #re_path(r'search/{searchTerms}/$',feeds.OpenSearch, name='search_template'),
 
-    re_path(r'^search/books/(?P<searchtype>[bmasguednx])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
-    re_path(r'^search/books/(?P<searchtype>[bmasguednx])/(?P<searchterms>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
+    re_path(r'^search/books/(?P<searchtype>[bmasguednxr])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
+    re_path(r'^search/books/(?P<searchtype>[bmasguednxr])/(?P<searchterms>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/(?P<searchterms0>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/(?P<searchterms0>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/$',feeds.SelectSeriesFeed(), name='searchbooks'),
@@ -40,6 +40,7 @@ urlpatterns = [
     # searchbooks patterns already match this path (searchtype 'n' with a dummy
     # searchterms), the name just gives the term-less feed a no-argument target.
     re_path(r'^search/books/n/0/$',feeds.SearchBooksFeed(), name='newbooks'),
+    re_path(r'^search/books/r/0/$',feeds.SearchBooksFeed(), name='toprated'),
 
     re_path(r'^search/authors/(?P<searchtype>[bme])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchAuthorsFeed(), name='searchauthors'),
     re_path(r'^search/authors/(?P<searchtype>[bme])/(?P<searchterms>.+)/$',feeds.SearchAuthorsFeed(), name='searchauthors'),

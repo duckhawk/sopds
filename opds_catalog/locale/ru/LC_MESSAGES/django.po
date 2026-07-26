@@ -140,6 +140,20 @@ msgstr "<b>ISBN: </b>%(isbn)s<br/>"
 msgid "<b>Publisher: </b>%(publisher)s<br/>"
 msgstr "<b>Издательство: </b>%(publisher)s<br/>"
 
+#: .\opds_catalog\feeds.py:170
+msgid "Top rated"
+msgstr "Лучшие по оценке"
+
+#: .\opds_catalog\feeds.py:171
+#, python-format
+msgid "Best rated by readers. Rated books: %(rated)s."
+msgstr "Книги с лучшими оценками читателей. Оценено книг: %(rated)s."
+
+#: .\opds_catalog\feeds.py:629
+#, python-format
+msgid "<b>Rating: </b>%(rating_average)s/5 (%(rating_votes)s)<br/>"
+msgstr "<b>Оценка: </b>%(rating_average)s/5 (%(rating_votes)s)<br/>"
+
 #: .\opds_catalog\feeds.py:357 .\opds_catalog\tests\test_feeds.py:60
 msgid "Search by titles"
 msgstr "Поиск по наименованиям"

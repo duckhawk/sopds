@@ -473,6 +473,19 @@ msgstr "Издательство:"
 msgid "Progress:"
 msgstr "Прогресс:"
 
+#: templates/sopds_nav.html:77 views.py:256
+msgid "Top rated"
+msgstr "Лучшие по оценке"
+
+#: templates/sopds_books.html:88
+#, python-format
+msgid "%(votes)s rating"
+msgid_plural "%(votes)s ratings"
+msgstr[0] "%(votes)s оценка"
+msgstr[1] "%(votes)s оценки"
+msgstr[2] "%(votes)s оценок"
+msgstr[3] "%(votes)s оценок"
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"
