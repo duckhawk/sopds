@@ -29,6 +29,15 @@ msgstr "Все книги автора %(author)s"
 msgid "Book doublicates"
 msgstr "Дубликаты книги"
 
+#: .\opds_catalog\feeds.py:166
+msgid "Recently added"
+msgstr "Недавно добавленные"
+
+#: .\opds_catalog\feeds.py:167
+#, python-format
+msgid "The newest books in the collection. Books: %(books)s."
+msgstr "Самые свежие книги коллекции. Книг: %(books)s."
+
 #: .\opds_catalog\feeds.py:165 .\opds_catalog\feeds.py:250
 #: .\opds_catalog\feeds.py:252 .\opds_catalog\tests\test_feeds.py:24
 msgid "By catalogs"

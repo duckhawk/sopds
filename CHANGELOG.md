@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Recently added** listing — the "what's new" entry point the catalogue was
+  missing. It is the first item of the OPDS root feed (`/opds/search/books/n/0/`,
+  search type `n`) and the first item of the web navigation
+  (`/web/search/books/?searchtype=n`), paginated like any other book list and
+  ordered by registration date, newest first. Migration `0020` adds the
+  matching `(registerdate DESC, id DESC)` index so paging through a large
+  catalogue reads the order off the index instead of sorting the table.
+  Russian translations included.
 - htmx live-search suggestions in the header search box (title/author/series),
   as progressive enhancement.
 - Title suggestions now show the book's first author next to the title, so

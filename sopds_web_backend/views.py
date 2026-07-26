@@ -228,7 +228,13 @@ def SearchBooksView(request):
             books = Book.objects.filter(genres=genre_id).order_by('search_title','-docdate') 
             args['searchobject'] = 'genre'
                                    
-        # Поиск книг на книжной полке            
+        # Недавно добавленные книги (searchterms не используется)
+        elif searchtype == 'n':
+            books = Book.objects.all().order_by('-registerdate', '-id')
+            args['breadcrumbs'] = [_('Books'), _('Recently added')]
+            args['searchobject'] = 'title'
+
+        # Поиск книг на книжной полке
         elif searchtype == 'u':
             if config.SOPDS_AUTH:
                 books = Book.objects.filter(bookshelf__user=request.user).order_by('-bookshelf__readtime')
