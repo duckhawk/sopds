@@ -22,13 +22,16 @@ from django.db import close_old_connections
 from django.db.models import Q
 from django.utils import timezone
 
-from opds_catalog import openlibrary
+from opds_catalog import openlibrary, opdsdb
 from opds_catalog.models import (
     Book, SIZE_BOOK_ANNOTATION, SIZE_BOOK_DOCDATE, SIZE_BOOK_PUBLISHER,
 )
 
 # Field -> column width, so a long remote value is truncated rather than
 # rejected by the DB.
+# A sane ceiling on how many authors one remote record may attach.
+MAX_AUTHORS = 10
+
 FIELD_LIMITS = {
     'annotation': SIZE_BOOK_ANNOTATION,
     'docdate': SIZE_BOOK_DOCDATE,
@@ -70,7 +73,7 @@ class Command(BaseCommand):
             books = books[:limit]
         books = list(books)
 
-        looked_up = updated = not_found = nothing_new = failed = 0
+        looked_up = updated = not_found = nothing_new = failed = authors_added = 0
         # Only books whose batch actually reached the API get stamped as tried; a
         # batch lost to a timeout has to stay a candidate for the next run.
         answered = []
@@ -101,14 +104,18 @@ class Command(BaseCommand):
 
                 for book in rows:
                     changed = self.apply(book, fields, force)
-                    if not changed:
+                    got_authors = self.apply_authors(book, fields.get('authors'), dry_run)
+                    if not changed and not got_authors:
                         nothing_new += 1
                         continue
 
                     updated += 1
+                    if got_authors:
+                        authors_added += 1
                     if verbose:
+                        named = sorted(changed) + (['authors'] if got_authors else [])
                         self.stdout.write('Book %s (%s): %s'
-                                          % (book.id, book.isbn, ', '.join(sorted(changed))))
+                                          % (book.id, book.isbn, ', '.join(named)))
                     if not dry_run:
                         changed['enriched'] = timezone.now()
                         Book.objects.filter(pk=book.pk).update(**changed)
@@ -121,10 +128,11 @@ class Command(BaseCommand):
         prefix = 'DRY-RUN: ' if dry_run else ''
         self.stdout.write(
             '%sEnrichment done. Candidates: %d, ISBNs looked up: %d, %s: %d, '
-            'not in Open Library: %d, nothing to add: %d, lookups failed: %d'
+            'not in Open Library: %d, nothing to add: %d, lookups failed: %d, '
+            'given authors: %d'
             % (prefix, len(books), looked_up,
                'would update' if dry_run else 'updated', updated, not_found,
-               nothing_new, failed)
+               nothing_new, failed, authors_added)
         )
 
     def candidates(self, force):
@@ -134,14 +142,15 @@ class Command(BaseCommand):
             return qs.order_by('id')
         # Skip anything a previous run already resolved or tried, and anything
         # that has nothing left to fill.
-        has_a_gap = Q(annotation='') | Q(docdate='') | Q(publisher='')
+        has_a_gap = (Q(annotation='') | Q(docdate='') | Q(publisher='')
+                     | Q(authors__isnull=True))
         return qs.filter(enriched__isnull=True).filter(has_a_gap).order_by('id')
 
     def apply(self, book, fields, force):
         """Return the subset of `fields` this book should actually be updated with."""
         changed = {}
         for name, value in fields.items():
-            if not value:
+            if not value or name not in FIELD_LIMITS:
                 continue
             if not force and getattr(book, name):
                 continue
@@ -149,6 +158,24 @@ class Command(BaseCommand):
             if new != getattr(book, name):
                 changed[name] = new
         return changed
+
+    def apply_authors(self, book, names, dry_run):
+        """Attach authors to a book that has none. Returns True if it did.
+
+        Only ever fills a gap: a book that already has an author keeps it, even
+        under --force. The parser read that name out of the file itself, and one
+        ISBN can cover editions credited differently — a translation, an
+        anthology, an edition that adds an illustrator. Replacing a known author
+        with a remote guess is the kind of "fix" that is very hard to undo once
+        it has run over a whole catalogue.
+        """
+        if not names or book.authors.exists():
+            return False
+
+        if not dry_run:
+            for name in names[:MAX_AUTHORS]:
+                opdsdb.addbauthor(book, opdsdb.addauthor(name))
+        return True
 
     def mark_tried(self, books):
         ids = [b.pk for b in books]

@@ -51,6 +51,17 @@ def parse_details(details):
     if isinstance(publish_date, str) and publish_date.strip():
         out['docdate'] = publish_date.strip()
 
+    # Open Library gives authors as [{'name': ..., 'key': ...}]. Only the names
+    # are useful here: the catalogue keys authors by name, and matching an
+    # Open Library author key to a local Author would be guesswork.
+    names = []
+    for author in details.get('authors') or []:
+        name = (author or {}).get('name') if isinstance(author, dict) else None
+        if isinstance(name, str) and name.strip():
+            names.append(name.strip())
+    if names:
+        out['authors'] = names
+
     return out
 
 

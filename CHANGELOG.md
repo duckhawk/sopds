@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `sopds_enrich` now also gives a book its **authors**, when it has none and
+  Open Library knows them. A book whose file carried no author metadata was
+  previously unreachable through the author browser and the author search;
+  now it is. An author that is already recorded is never replaced, not even
+  under `--force` — the parser read that name out of the file itself, one ISBN
+  can cover editions credited differently, and overwriting a known author with
+  a remote guess is very hard to undo once it has run over a whole catalogue.
+  Author rows are reused rather than duplicated, get their search name filled
+  so the new author is findable, and are capped per book.
+  Cover images are still not fetched: that needs either a third-party request
+  from every reader's browser — which the OPDS descriptor was just cured of —
+  or local storage this project does not yet have, so it wants its own change.
 - **Genres can be searched by name**, in OPDS (`/opds/search/genres/m/<term>/`,
   and an entry in the OPDS search menu) and in the web UI (a *Genre* option in
   the search-type chooser). They were browsable through the section tree but
