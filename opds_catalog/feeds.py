@@ -8,13 +8,13 @@ from django.http import Http404
 from django.db.models import Count, Min
 from django.utils.html import strip_tags
 
-from opds_catalog.models import Book, Catalog, Author, Genre, Series, bookshelf, Counter
+from opds_catalog.models import Book, Catalog, Author, Genre, Series, bookshelf, Counter, BookStat
 from opds_catalog import models
 from opds_catalog import settings
 from opds_catalog.middleware import BasicAuthMiddleware
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
-from opds_catalog import ratings
+from opds_catalog import ratings, stats
 
 from book_tools.format import mime_detector
 from book_tools.format.mimetype import Mimetype
@@ -170,6 +170,8 @@ class MainFeed(AuthFeed):
                      "descr": _("The newest books in the collection. Books: %(books)s."),"counters":{"books":Counter.objects.get_counter(models.counter_allbooks)}},
                     {"id":8, "title":_("Top rated"), "link":"opds_catalog:toprated",
                      "descr": _("Best rated by readers. Rated books: %(rated)s."),"counters":{"rated":bookshelf.objects.filter(rating__isnull=False).values('book').distinct().count()}},
+                    {"id":9, "title":_("Most popular"), "link":"opds_catalog:popular",
+                     "descr": _("Most downloaded from the collection. Books taken: %(taken)s."),"counters":{"taken":BookStat.objects.filter(downloads__gt=0).count()}},
                     {"id":1, "title":_("By catalogs"), "link":"opds_catalog:catalogs",
                      "descr": _("Catalogs: %(catalogs)s, books: %(books)s."),"counters":{"catalogs":Counter.objects.get_counter(models.counter_allcatalogs),"books":Counter.objects.get_counter(models.counter_allbooks)}},
                     {"id":2, "title":_("By authors"), "link":("opds_catalog:lang_authors" if config.SOPDS_ALPHABET_MENU else "opds_catalog:nolang_authors"),
@@ -413,6 +415,8 @@ class SearchBooksFeed(AuthFeed):
             return "%s | %s"%(settings.TITLE,_("Recently added"))
         if obj["searchtype"] == 'r':
             return "%s | %s"%(settings.TITLE,_("Top rated"))
+        if obj["searchtype"] == 'p':
+            return "%s | %s"%(settings.TITLE,_("Most popular"))
         return "%s | %s (%s)"%(settings.TITLE,_("Books found"),_("doubles hide") if config.SOPDS_DOUBLES_HIDE else _("doubles show"))
 
     def get_object(self, request, searchtype="m", searchterms=None, searchterms0=None, page=1):
@@ -477,6 +481,9 @@ class SearchBooksFeed(AuthFeed):
         # Книги с лучшей оценкой сообщества (searchterms не используется)
         elif searchtype == 'r':
             books = ratings.top_rated()
+        # Самые скачиваемые книги (searchterms не используется)
+        elif searchtype == 'p':
+            books = stats.most_popular()
         # Поиск книг на книжной полке
         elif searchtype == 'u':
             if config.SOPDS_AUTH:
@@ -525,6 +532,7 @@ class SearchBooksFeed(AuthFeed):
 
         # One query for the whole page, keyed on ids we already have.
         page_ratings = ratings.summary(r.id for r in page_rows)
+        page_stats = stats.summary(r.id for r in page_rows)
         for row in page_rows:
             p = {'doubles':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
                   'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
@@ -533,7 +541,8 @@ class SearchBooksFeed(AuthFeed):
                   'genres':[{'id': g.id, 'subsection': g.subsection} for g in row.genres.all()],
                   'series':[{'id': s.id, 'ser': s.ser} for s in row.series.all()],
                   'ser_no':[{'ser_no': b.ser_no} for b in row.bseries_set.all()],
-                  'rating': page_ratings.get(row.id)}
+                  'rating': page_ratings.get(row.id),
+                  'stat': page_stats.get(row.id)}
             if summary_DOUBLES_HIDE:
                 title = p['title'] 
                 authors_set = {a['id'] for a in p['authors']}         
@@ -646,6 +655,7 @@ class SearchBooksFeed(AuthFeed):
         if item['isbn']: s += _("<b>ISBN: </b>%(isbn)s<br/>")
         if item['publisher']: s += _("<b>Publisher: </b>%(publisher)s<br/>")
         if item['rating']: s += _("<b>Rating: </b>%(rating_average)s/5 (%(rating_votes)s)<br/>")
+        if item['stat']: s += _("<b>Downloads: </b>%(downloads)s<br/>")
         s += _("<b>File: </b>%(filename)s<br/><b>File size: </b>%(filesize)s<br/><b>Changes date: </b>%(docdate)s<br/>")
         if item['doubles']: s += _("<b>Doubles count: </b>%(doubles)s<br/>")
         s +="<p class='book'>%(annotation)s</p>"
@@ -653,6 +663,7 @@ class SearchBooksFeed(AuthFeed):
                   'doubles':item['doubles'],'annotation':item['annotation'],'isbn':item['isbn'],'publisher':item['publisher'],
                   'rating_average':(item['rating'] or {}).get('average'),
                   'rating_votes':(item['rating'] or {}).get('votes'),
+                  'downloads':(item['stat'] or {}).get('downloads'),
                   'authors':", ".join(a['full_name'] for a in item['authors']),
                   'genres':", ".join(g['subsection'] for g in item['genres']),
                   'series':", ".join(s['ser'] for s in item['series']),

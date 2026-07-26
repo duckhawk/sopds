@@ -154,6 +154,20 @@ msgstr "Книги с лучшими оценками читателей. Оце
 msgid "<b>Rating: </b>%(rating_average)s/5 (%(rating_votes)s)<br/>"
 msgstr "<b>Оценка: </b>%(rating_average)s/5 (%(rating_votes)s)<br/>"
 
+#: .\opds_catalog\feeds.py:173
+msgid "Most popular"
+msgstr "Самые популярные"
+
+#: .\opds_catalog\feeds.py:174
+#, python-format
+msgid "Most downloaded from the collection. Books taken: %(taken)s."
+msgstr "Самые скачиваемые книги коллекции. Книг брали: %(taken)s."
+
+#: .\opds_catalog\feeds.py:632
+#, python-format
+msgid "<b>Downloads: </b>%(downloads)s<br/>"
+msgstr "<b>Скачиваний: </b>%(downloads)s<br/>"
+
 #: .\opds_catalog\feeds.py:357 .\opds_catalog\tests\test_feeds.py:60
 msgid "Search by titles"
 msgstr "Поиск по наименованиям"

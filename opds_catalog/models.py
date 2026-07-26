@@ -200,6 +200,33 @@ class Counter(models.Model):
     objects = CounterManager()
 
 
+class BookStat(models.Model):
+    """How often a book has been taken out of the library.
+
+    Aggregate counters, deliberately not a log of events. A per-request table
+    would grow without bound under e-reader polling and would amount to a
+    reading history for every user, which is a much bigger thing to store than
+    "how popular is this book" — and popularity is all anything here needs. The
+    numbers are anonymous: nothing records *who* downloaded what. A user's own
+    history already lives in `bookshelf`, where they can see and clear it.
+    """
+    book = models.OneToOneField(Book, on_delete=models.CASCADE,
+                                primary_key=True, related_name='stat')
+    downloads = models.PositiveIntegerField(default=0)
+    reads = models.PositiveIntegerField(default=0)
+    last_used = models.DateTimeField(null=True, default=None)
+
+    class Meta:
+        indexes = [
+            # Serves the "most downloaded" listing, which pages through the
+            # whole table in descending order.
+            models.Index(F('downloads').desc(), name='bookstat_downloads_desc'),
+        ]
+
+    def __str__(self):
+        return 'book %s: %d downloads, %d reads' % (self.book_id, self.downloads, self.reads)
+
+
 class ScanSeen(models.Model):
     """Scratch list of book ids seen during the current library scan.
 

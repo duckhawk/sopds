@@ -20,7 +20,7 @@ from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalo
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
-from opds_catalog import dl, ratings
+from opds_catalog import dl, ratings, stats
 from constance import config
 from sopds_web_backend import oidc
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
@@ -257,6 +257,12 @@ def SearchBooksView(request):
             args['breadcrumbs'] = [_('Books'), _('Top rated')]
             args['searchobject'] = 'title'
 
+        # Самые скачиваемые книги (searchterms не используется)
+        elif searchtype == 'p':
+            books = stats.most_popular()
+            args['breadcrumbs'] = [_('Books'), _('Most popular')]
+            args['searchobject'] = 'title'
+
         # Поиск книг на книжной полке
         elif searchtype == 'u':
             if config.SOPDS_AUTH:
@@ -348,6 +354,7 @@ def SearchBooksView(request):
 
         # One query for the whole page, keyed on ids we already have.
         page_ratings = ratings.summary(r.id for r in page_rows)
+        page_stats = stats.summary(r.id for r in page_rows)
 
         for row in page_rows:
             user_shelf = getattr(row, 'user_shelf', []) if config.SOPDS_AUTH else []
@@ -374,6 +381,7 @@ def SearchBooksView(request):
                  'rating': user_shelf[0].rating if user_shelf else None,
                  # The user's own star count, and what everyone else made of it.
                  'rating_all': page_ratings.get(row.id),
+                 'stat': page_stats.get(row.id),
                  'readable': row.format in dl.READABLE_FORMATS,
                  # Percentage read, as reported by an e-reader over kosync.
                  'percent': user_shelf[0].percent if user_shelf else None
@@ -1082,6 +1090,11 @@ def BookReaderView(request, book_id):
     book = get_object_or_404(Book, id=book_id)
     if book.format not in dl.READABLE_FORMATS:
         raise Http404
+
+    # Counted here rather than on the content route: that one answers a
+    # revalidation with 304 before the view runs, so re-opening a book would go
+    # unrecorded. Opening the reader is the event worth counting anyway.
+    stats.record(book.id, stats.READS)
 
     prefs = user_prefs(request.user)
     args = {}

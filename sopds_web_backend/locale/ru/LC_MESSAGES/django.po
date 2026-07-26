@@ -486,6 +486,23 @@ msgstr[1] "%(votes)s оценки"
 msgstr[2] "%(votes)s оценок"
 msgstr[3] "%(votes)s оценок"
 
+#: templates/sopds_nav.html:78 views.py:264
+msgid "Most popular"
+msgstr "Самые популярные"
+
+#: templates/sopds_books.html:84
+msgid "Taken:"
+msgstr "Брали:"
+
+#: templates/sopds_books.html:85
+#, python-format
+msgid "%(n)s download"
+msgid_plural "%(n)s downloads"
+msgstr[0] "%(n)s раз"
+msgstr[1] "%(n)s раза"
+msgstr[2] "%(n)s раз"
+msgstr[3] "%(n)s раз"
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"

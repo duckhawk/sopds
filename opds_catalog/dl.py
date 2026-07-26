@@ -22,7 +22,7 @@ from django.utils.cache import patch_cache_control
 from django.views.decorators.http import etag
 
 from opds_catalog.models import Book, bookshelf
-from opds_catalog import settings, utils, opdsdb, fb2parse, epub_render
+from opds_catalog import settings, utils, opdsdb, fb2parse, epub_render, stats
 import zipfile
 from opds_catalog.ziptools import open_zipfile
 
@@ -333,6 +333,8 @@ def Download(request, book_id, zip_flag):
     if config.SOPDS_AUTH and request.user.is_authenticated:
         bookshelf.objects.get_or_create(user=request.user, book=book)
 
+    stats.record(book.id, stats.DOWNLOADS)
+
     full_path=os.path.join(config.SOPDS_ROOT_LIB,book.path)
     
     if book.cat_type==opdsdb.CAT_INP:
@@ -572,6 +574,8 @@ def ConvertFB2(request, book_id, convert_type):
 
     if config.SOPDS_AUTH and request.user.is_authenticated:
         bookshelf.objects.get_or_create(user=request.user, book=book)
+
+    stats.record(book.id, stats.DOWNLOADS)
 
     full_path=os.path.join(config.SOPDS_ROOT_LIB,book.path)
     if book.cat_type==opdsdb.CAT_INP:
