@@ -73,6 +73,7 @@
 
     <ul class="lx-primary">
       <li {% if searchtype == "n" %}class="active"{% endif %}><a href="{% url "web:searchbooks" %}?searchtype=n">{% trans "Recently added" %}</a></li>
+      <li {% if searchtype == "r" %}class="active"{% endif %}><a href="{% url "web:searchbooks" %}?searchtype=r">{% trans "Top rated" %}</a></li>
       <li {% if current == "catalog" %}class="active"{% endif %}><a href="{% url "web:catalog" %}">{% trans "Catalogs" %}</a></li>
 
       {% if not alphabet %}
