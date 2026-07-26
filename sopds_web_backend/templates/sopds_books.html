@@ -100,6 +100,12 @@
 				{% if b.readtime %}
                     <b>{% trans "Read date:" %}</b> <span class="label small">{{ b.readtime.0.readtime }}</span><br>
 				{% endif %}
+				<b>{% trans "Tags:" %}</b>
+				<span class="bk-tags" data-book="{{ b.id }}">
+				{% for t in b.tags %}<span class="label small" data-tag="{{ t.id }}"><a href="{% url "web:searchbooks" %}?searchtype=t&searchterms={{ t.id }}" style="color:inherit;">{{ t.name }}</a>{% if b.tags_editable %} <a href="#" onclick="tagRemove({{ b.id }},{{ t.id }});return false;" title="{% trans "Remove" %}">&times;</a>{% endif %}</span> {% endfor %}
+				</span>
+				{% if b.tags_editable %}<a href="#" onclick="tagAdd({{ b.id }});return false;"><span class="secondary label small">+</span></a>{% endif %}
+				<br>
 				{% if b.stat %}
 				   <b>{% trans "Taken:" %}</b> <span class="label small">{% blocktrans count n=b.stat.downloads %}{{ n }} download{% plural %}{{ n }} downloads{% endblocktrans %}</span><br>
 				{% endif %}
@@ -199,6 +205,24 @@
 			if (res && res.ok){ c.setAttribute('data-rating', res.rating || 0); bsRenderStars(c); }
 		});
 	}
+	var TAG_ADD_URL = "{% url 'web:tag_add' 0 %}";
+	var TAG_DEL_URL = "{% url 'web:tag_remove' 0 %}";
+
+	function tagAdd(id){
+		var name = prompt("{% trans "Tag" %}");
+		if (!name) return;
+		bsPost(TAG_ADD_URL.replace('/0/', '/' + id + '/'), {name: name}, function(res){
+			if (res && res.ok) location.reload();
+			else alert((res && res.error) || "{% trans "That tag could not be added." %}");
+		});
+	}
+
+	function tagRemove(id, tagId){
+		bsPost(TAG_DEL_URL.replace('/0/', '/' + id + '/'), {tag: tagId}, function(res){
+			if (res && res.ok) location.reload();
+		});
+	}
+
 	var SEND_URL = "{% url 'web:send_to_device' 0 %}";
 
 	function sendToDevice(id){

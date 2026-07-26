@@ -8,13 +8,13 @@ from django.http import Http404
 from django.db.models import Count, Min
 from django.utils.html import strip_tags
 
-from opds_catalog.models import Book, Catalog, Author, Genre, Series, bookshelf, Counter, BookStat
+from opds_catalog.models import Book, Catalog, Author, Genre, Series, Tag, bookshelf, Counter, BookStat
 from opds_catalog import models
 from opds_catalog import settings
 from opds_catalog.middleware import BasicAuthMiddleware
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
-from opds_catalog import ratings, stats
+from opds_catalog import ratings, stats, tags
 
 from book_tools.format import mime_detector
 from book_tools.format.mimetype import Mimetype
@@ -178,6 +178,8 @@ class MainFeed(AuthFeed):
                      "descr": _("Best rated by readers. Rated books: %(rated)s."),"counters":{"rated":bookshelf.objects.filter(rating__isnull=False).values('book').distinct().count()}},
                     {"id":9, "title":_("Most popular"), "link":"opds_catalog:popular",
                      "descr": _("Most downloaded from the collection. Books taken: %(taken)s."),"counters":{"taken":BookStat.objects.filter(downloads__gt=0).count()}},
+                    {"id":10, "title":_("By tags"), "link":"opds_catalog:tags",
+                     "descr": _("Labels this library's readers put on books. Tags: %(tags)s."),"counters":{"tags":Tag.objects.filter(btag__isnull=False).distinct().count()}},
                     {"id":1, "title":_("By catalogs"), "link":"opds_catalog:catalogs",
                      "descr": _("Catalogs: %(catalogs)s, books: %(books)s."),"counters":{"catalogs":Counter.objects.get_counter(models.counter_allcatalogs),"books":Counter.objects.get_counter(models.counter_allbooks)}},
                     {"id":2, "title":_("By authors"), "link":("opds_catalog:lang_authors" if config.SOPDS_ALPHABET_MENU else "opds_catalog:nolang_authors"),
@@ -494,6 +496,12 @@ class SearchBooksFeed(AuthFeed):
         # Самые скачиваемые книги (searchterms не используется)
         elif searchtype == 'p':
             books = stats.most_popular()
+        # Книги с заданным тегом
+        elif searchtype == 't':
+            try:
+                books = tags.books_with(int(searchterms))
+            except (TypeError, ValueError):
+                raise Http404
         # Поиск книг на книжной полке
         elif searchtype == 'u':
             if config.SOPDS_AUTH:
@@ -972,6 +980,46 @@ class SearchGenresFeed(AuthFeed):
     def item_link(self, item):
         return reverse("opds_catalog:searchbooks",
                        kwargs={"searchtype":"g", "searchterms":item['id']})
+
+    def item_enclosures(self, item):
+        return (opdsEnclosure(self.item_link(item),"application/atom+xml;profile=opds-catalog;kind=navigation", "subsection"),)
+
+class TagsFeed(AuthFeed):
+    """Every tag in use, each leading to the books that carry it."""
+    feed_type = opdsFeed
+    subtitle = settings.SUBTITLE
+
+    def title(self, obj):
+        return "%s | %s"%(settings.TITLE,_("Tags"))
+
+    def link(self, obj):
+        return reverse("opds_catalog:tags")
+
+    def get_object(self, request):
+        return list(tags.in_use())
+
+    def feed_extra_kwargs(self, obj):
+        return {
+                "searchTerm_url":"%s%s"%(reverse("opds_catalog:opensearch"),'{searchTerms}/'),
+                "start_url":reverse("opds_catalog:main"),
+                "description_mime_type":"text",
+        }
+
+    def items(self, obj):
+        return obj
+
+    def item_title(self, item):
+        return item.name
+
+    def item_description(self, item):
+        return _("Books count: %s")%item.book_count
+
+    def item_guid(self, item):
+        return "t:%s"%item.id
+
+    def item_link(self, item):
+        return reverse("opds_catalog:searchbooks",
+                       kwargs={"searchtype":"t", "searchterms":item.id})
 
     def item_enclosures(self, item):
         return (opdsEnclosure(self.item_link(item),"application/atom+xml;profile=opds-catalog;kind=navigation", "subsection"),)

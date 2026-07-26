@@ -539,6 +539,30 @@ msgstr "Забыли пароль?"
 msgid "Create an account"
 msgstr "Создать учётную запись"
 
+#: templates/sopds_books.html:100
+msgid "Tags:"
+msgstr "Теги:"
+
+#: templates/sopds_nav.html:79 views.py:930
+msgid "Tags"
+msgstr "Теги"
+
+#: views.py:270
+msgid "Tag"
+msgstr "Тег"
+
+#: templates/sopds_tags.html:16
+msgid "No tags yet. Add one from a book's card."
+msgstr "Тегов пока нет. Добавьте первый на карточке книги."
+
+#: views.py:880
+msgid "That tag could not be added."
+msgstr "Не удалось добавить тег."
+
+#: views.py:876
+msgid "Tag editing is disabled."
+msgstr "Редактирование тегов отключено."
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"

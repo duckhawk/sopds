@@ -31,6 +31,7 @@ SIZE_GENRE_SECTION   = 64
 SIZE_GENRE_SUBSECTION = 100
 
 SIZE_SERIES          = 150
+SIZE_TAG             = 64
 
 
 LangCodes = {1:'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЫЪЭЮЯабвгдеёжзийклмнопрстуфхцчшщьыъэюя',
@@ -65,6 +66,7 @@ class Book(models.Model):
     authors = models.ManyToManyField('Author', through='bauthor')
     genres = models.ManyToManyField('Genre', through='bgenre')
     series = models.ManyToManyField('Series', through='bseries')
+    tags = models.ManyToManyField('Tag', through='btag')
 
     class Meta:
         indexes = [
@@ -125,6 +127,39 @@ class bseries(models.Model):
 #        index_together = [
 #            ["book", "ser"],
 #        ]
+
+
+class Tag(models.Model):
+    """A free-form label on a book, shared by everyone using the catalogue.
+
+    Genres come out of the book files and follow a fixed taxonomy nobody here
+    chose. Tags are the other half: whatever this library's readers find worth
+    marking — "to lend", "book club", "signed" — which no parser will ever
+    produce.
+
+    Library-wide rather than per-reader, like genres and unlike ratings: the
+    point is a shared organisation of a shared shelf. That does mean any
+    signed-in reader can retag a book, which is fine among people who share a
+    library and less fine once SOPDS_ALLOW_REGISTRATION is on — hence
+    SOPDS_TAGS_EDITABLE, which closes editing without hiding the tags.
+    """
+    name = models.CharField(max_length=SIZE_TAG, unique=True)
+    # Upper-cased for lookups, matching how search_title and search_ser work.
+    search_name = models.CharField(max_length=SIZE_TAG, default='', db_index=True)
+
+    class Meta:
+        ordering = ['search_name']
+
+    def __str__(self):
+        return self.name
+
+
+class btag(models.Model):
+    book = models.ForeignKey('Book', db_index=True, on_delete=models.CASCADE)
+    tag = models.ForeignKey('Tag', db_index=True, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ['book', 'tag']
 
 
 class Theme(models.Model):

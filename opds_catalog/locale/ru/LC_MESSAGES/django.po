@@ -181,6 +181,19 @@ msgstr "Поиск жанров по названию"
 msgid "Genres found"
 msgstr "Найдены жанры"
 
+#: .\opds_catalog\feeds.py:176
+msgid "By tags"
+msgstr "По тегам"
+
+#: .\opds_catalog\feeds.py:177
+#, python-format
+msgid "Labels this library's readers put on books. Tags: %(tags)s."
+msgstr "Метки, которые читатели поставили книгам. Тегов: %(tags)s."
+
+#: .\opds_catalog\feeds.py:1040
+msgid "Tags"
+msgstr "Теги"
+
 #: .\opds_catalog\feeds.py:357 .\opds_catalog\tests\test_feeds.py:60
 msgid "Search by titles"
 msgstr "Поиск по наименованиям"

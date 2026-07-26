@@ -1,0 +1,17 @@
+{% extends "sopds_main.html" %}
+{% load i18n %}
+
+{% block body %}
+{% if items %}
+<div class="large-12 column">
+  {% for t in items %}
+    <a href="{% url "web:searchbooks" %}?searchtype=t&searchterms={{ t.id }}"
+       style="display:inline-block;margin:.2rem;">
+      <span class="label">{{ t.name }}</span><span class="secondary label small">{{ t.book_count }}</span>
+    </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="large-12 column"><p>{% trans "No tags yet. Add one from a book's card." %}</p></div>
+{% endif %}
+{% endblock %}{# body #}
