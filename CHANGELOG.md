@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Scans are recorded.** The scanner counted books added, removed, skipped and
+  unparseable, then wrote the numbers to a log file and forgot them, so the
+  outcome of a scan was invisible to the application — including whether it
+  finished at all. A crashed scan left only a stack trace somewhere and a
+  catalogue that had quietly stopped growing. Each run now opens a `ScanRun`
+  row and closes it with its counters and its outcome, a failure is recorded
+  as a failure, and the history is browsable read-only in the admin. The
+  metrics endpoint reports the last run's success, duration, books added and
+  removed, unparseable files, and whether a scan is in progress. Reporting
+  swallows its own errors throughout: observability is not worth failing the
+  thing being observed. Migration `0024`.
 - **Prometheus metrics at `/metrics`**, off by default
   (`SOPDS_METRICS_ENABLE`), with an optional bearer token
   (`SOPDS_METRICS_TOKEN`). Until now the only observability was a liveness and

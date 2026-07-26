@@ -67,7 +67,7 @@ def render(samples):
 def collect():
     """Every sample, as the tuples `render` expects."""
     from opds_catalog import models, settings
-    from opds_catalog.models import Book, BookStat, Counter, bookshelf
+    from opds_catalog.models import Book, BookStat, Counter, ScanRun, bookshelf
 
     counter = Counter.objects
     totals = BookStat.objects.aggregate(downloads=Sum('downloads'), reads=Sum('reads'))
@@ -108,6 +108,39 @@ def collect():
         ('lectern_last_scan_timestamp_seconds',
          'When the last scan finished, in unix seconds. Absent if none ever has.',
          'gauge', int(lastscan.timestamp()) if lastscan else None, None),
+    ] + _scan_samples(ScanRun)
+
+
+def _scan_samples(ScanRun):
+    """What the last finished scan did, and whether one is running now.
+
+    Reported separately from the catalogue gauges because a scan that failed or
+    is still going has no business changing the counts above.
+    """
+    last = ScanRun.objects.exclude(status=ScanRun.RUNNING).order_by('-started').first()
+    running = ScanRun.objects.filter(status=ScanRun.RUNNING).count()
+
+    samples = [
+        ('lectern_scan_running', 'Scans currently in progress.', 'gauge', running, None),
+    ]
+    if last is None:
+        return samples
+
+    return samples + [
+        ('lectern_last_scan_success',
+         'Whether the last finished scan succeeded.', 'gauge',
+         1 if last.status == ScanRun.OK else 0, None),
+        ('lectern_last_scan_duration_seconds',
+         'How long the last finished scan took.', 'gauge',
+         int(last.duration_seconds or 0), None),
+        ('lectern_last_scan_books_added', 'Books added by the last scan.',
+         'gauge', last.books_added, None),
+        ('lectern_last_scan_books_deleted', 'Books removed by the last scan.',
+         'gauge', last.books_deleted, None),
+        ('lectern_last_scan_bad_books',
+         'Files the last scan could not parse.', 'gauge', last.bad_books, None),
+        ('lectern_last_scan_bad_archives',
+         'Archives the last scan could not read.', 'gauge', last.bad_archives, None),
     ]
 
 

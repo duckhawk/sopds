@@ -10,9 +10,11 @@ from book_tools.format import create_bookfile, MAX_BOOK_BYTES
 from book_tools.format.util import strip_symbols
 
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from opds_catalog import fb2parse, opdsdb
+from opds_catalog.models import ScanRun
 from opds_catalog import inpx_parser
 import zipfile
 from opds_catalog.ziptools import open_zipfile
@@ -80,6 +82,7 @@ class opdsScanner:
     def scan_all(self):
         self.init_stats()
         self.log_options()
+        self.run = self.start_report()
         self.inp_cat = None
         self.zip_file = None
         self.rel_path = None     
@@ -128,6 +131,34 @@ class opdsScanner:
             self.books_deleted = opdsdb.scan_finish(logical=config.SOPDS_DELETE_LOGICAL)
 
         self.log_stats()
+        self.finish_report(ScanRun.OK)
+
+    def start_report(self):
+        """Open a ScanRun row for this run, or None if that is not possible.
+
+        Reporting must never be the reason a scan does not happen, so every
+        failure here is swallowed and the scan proceeds unrecorded.
+        """
+        try:
+            return ScanRun.objects.create(status=ScanRun.RUNNING)
+        except Exception:
+            self.logger.exception('Could not open a scan report')
+            return None
+
+    def finish_report(self, status, error=''):
+        """Close the ScanRun row with the counters this run accumulated."""
+        if getattr(self, 'run', None) is None:
+            return
+        try:
+            ScanRun.objects.filter(pk=self.run.pk).update(
+                finished=timezone.now(), status=status, error=error[:4000],
+                books_added=self.books_added, books_deleted=self.books_deleted,
+                books_skipped=self.books_skipped, bad_books=self.bad_books,
+                books_in_archives=self.books_in_archives,
+                arch_scanned=self.arch_scanned, arch_skipped=self.arch_skipped,
+                bad_archives=self.bad_archives)
+        except Exception:
+            self.logger.exception('Could not close the scan report')
 
     def inpskip_callback(self, inpx, inp_file, inp_size):
 
