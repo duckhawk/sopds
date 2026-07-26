@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **EPUB can be read in the browser.** Until now the reader was FB2-only; #66
+  had removed the Read link everywhere else rather than leave it leading to a
+  500. Instead of bolting a second, client-side reader onto the page, the EPUB
+  is rendered server-side into the same flat stream of numbered paragraphs and
+  `TOC_n` chapter markers the FB2 stylesheet emits, so remembered position,
+  the progress bar, chapter mode and the font-size preference all work on EPUB
+  with no change to the reader and no new JavaScript dependency.
+  Illustrations are served from inside the archive by a new
+  `/opds/read/<id>/res/<path>` route. Because the markup comes from the book,
+  it is rebuilt against an allowlist rather than filtered: scripts, styles,
+  embedded objects, event handlers and `javascript:`/`data:`/`file:` links do
+  not survive, the book's own `class`/`style`/`id` are dropped so it cannot
+  restyle the reader or collide with the position ids, and an `<img>` is kept
+  only if it resolves to something the archive actually holds. PDF and DjVu
+  still download rather than open; those need a real client-side viewer.
 - **Ratings are aggregated across readers.** `bookshelf.rating` had been
   collected per user for a while but only ever read back to redraw that same
   user's own stars: nobody could see what the library as a whole thought of a

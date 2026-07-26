@@ -55,7 +55,10 @@ urlpatterns = [
     re_path(r'^cover/(?P<book_id>[0-9]+)/$',dl.Cover, name='cover'),
     re_path(r'^thumb/(?P<book_id>[0-9]+)/$',dl.Thumbnail, name='thumb'),
     re_path(r'^thumb/$',dl.NoCover, name='covertmpl'),
-    re_path(r'^read/(?P<book_id>[0-9]+)/$', dl.ReadFB2, name='read'),
+    re_path(r'^read/(?P<book_id>[0-9]+)/$', dl.Read, name='read'),
+    # Images referenced from a rendered EPUB. The path is matched loosely and
+    # validated against the archive's own name list in the view.
+    re_path(r'^read/(?P<book_id>[0-9]+)/res/(?P<path>.+)$', dl.ReadResource, name='readres'),
 
     re_path(r'^$',feeds.MainFeed(), name='main'),
 ]

@@ -7,6 +7,8 @@ import io
 import shlex
 import subprocess
 import lxml.etree as ET
+import mimetypes
+import posixpath
 from functools import wraps
 from re import search
 import logging
@@ -14,11 +16,12 @@ import logging
 from django.core.cache import cache
 from django.http import HttpResponse, Http404
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils.cache import patch_cache_control
 from django.views.decorators.http import etag
 
 from opds_catalog.models import Book, bookshelf
-from opds_catalog import settings, utils, opdsdb, fb2parse
+from opds_catalog import settings, utils, opdsdb, fb2parse, epub_render
 import zipfile
 from opds_catalog.ziptools import open_zipfile
 
@@ -38,6 +41,11 @@ logger = logging.getLogger(__name__)
 # tiny-but-huge-dimension image raises DecompressionBombError instead of
 # allocating gigabytes (real covers are far below this).
 Image.MAX_IMAGE_PIXELS = 64_000_000
+
+# Upper bound on a single illustration served out of an EPUB. Real cover art and
+# plates are far below this; the cap stops a crafted archive from making the
+# reader page pull a multi-gigabyte member.
+MAX_RESOURCE_BYTES = 32 * 1024 * 1024
 
 
 def require_catalog_access(view):
@@ -594,15 +602,88 @@ def ConvertFB2(request, book_id, convert_type):
     return response
 
 
+# Formats the in-browser reader can render. FB2 goes through FB2_22_xhtml.xsl,
+# EPUB through opds_catalog.epub_render; both produce the same flat stream of
+# numbered paragraphs, so the reader itself does not care which it got.
+READABLE_FORMATS = ('fb2', 'epub')
+
+
+@require_catalog_access
+def Read(request, book_id):
+    """Dispatch to the renderer for this book's format."""
+    book = get_object_or_404(Book, id=book_id)
+    if book.format == 'epub':
+        return render_epub(request, book)
+    return ReadFB2(request, book_id)
+
+
+def render_epub(request, book):
+    """ Чтение EPUB в браузере. Not a route: reached through `Read`. """
+    if config.SOPDS_AUTH and request.user.is_authenticated:
+        bookshelf.objects.get_or_create(user=request.user, book=book)
+
+    data = getFileData(book)
+    if data is None:
+        raise Http404
+
+    def resource_url(path):
+        return reverse('opds_catalog:readres',
+                       kwargs={'book_id': book.id, 'path': path})
+
+    try:
+        html = epub_render.render(data, resource_url)
+    except (epub_render.EpubError, zipfile.BadZipFile, KeyError) as err:
+        logger.warning('Cannot render EPUB for book %s: %s', book.id, err)
+        raise Http404
+
+    return HttpResponse(html, content_type='text/html; charset=utf-8')
+
+
+@require_catalog_access
+def ReadResource(request, book_id, path):
+    """Serve one image from inside an EPUB, for the rendered reader page.
+
+    Only images the package actually contains are served, and only as images:
+    the path is resolved against the archive's own name list, so a crafted
+    `src` cannot address anything outside it, and the content type is decided
+    here rather than taken from the book.
+    """
+    book = get_object_or_404(Book, id=book_id)
+    if book.format != 'epub':
+        raise Http404
+
+    data = getFileData(book)
+    if data is None:
+        raise Http404
+
+    try:
+        with zipfile.ZipFile(data) as archive:
+            # normpath collapses any ".." before the lookup, and membership in
+            # the archive is the authorisation: a name that is not in it is a 404.
+            wanted = posixpath.normpath(path).lstrip('/')
+            info = next((i for i in archive.infolist() if i.filename == wanted), None)
+            if info is None or info.file_size > MAX_RESOURCE_BYTES:
+                raise Http404
+            content_type = mimetypes.guess_type(wanted)[0] or ''
+            if not content_type.startswith('image/'):
+                raise Http404
+            payload = archive.read(info)
+    except zipfile.BadZipFile:
+        raise Http404
+
+    response = HttpResponse(payload, content_type=content_type)
+    patch_cache_control(response, private=True, max_age=config.SOPDS_CACHE_TIME)
+    return response
+
+
 @require_catalog_access
 def ReadFB2(request, book_id):
     """ Загрузка книги """
     book = get_object_or_404(Book, id=book_id)
 
-    # The reader renders a book by running FB2_22_xhtml.xsl over its XML, so it
-    # only works for FB2. Anything else reached ET.parse() and died there with a
-    # 500 (an EPUB or MOBI is a binary container, not XML). Mirror the guard
-    # ConvertFB2 already has.
+    # FB2_22_xhtml.xsl only understands FB2; anything else reached ET.parse()
+    # and died there with a 500 (an EPUB or MOBI is a binary container, not
+    # XML). Mirror the guard ConvertFB2 already has.
     if book.format != 'fb2':
         raise Http404
 

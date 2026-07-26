@@ -20,7 +20,7 @@ from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalo
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
-from opds_catalog import ratings
+from opds_catalog import dl, ratings
 from constance import config
 from sopds_web_backend import oidc
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
@@ -374,6 +374,7 @@ def SearchBooksView(request):
                  'rating': user_shelf[0].rating if user_shelf else None,
                  # The user's own star count, and what everyone else made of it.
                  'rating_all': page_ratings.get(row.id),
+                 'readable': row.format in dl.READABLE_FORMATS,
                  # Percentage read, as reported by an e-reader over kosync.
                  'percent': user_shelf[0].percent if user_shelf else None
                  }
@@ -1075,11 +1076,11 @@ def LogoutView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BookReaderView(request, book_id):
-    # The page is only a shell: it fetches opds:read, which can render FB2 and
-    # nothing else. Refuse here as well, so an unreadable format fails as a 404
-    # on the link instead of loading a reader that stays permanently empty.
+    # The page is only a shell: it fetches opds:read, which renders FB2 and EPUB
+    # and nothing else. Refuse here as well, so an unreadable format fails as a
+    # 404 on the link instead of loading a reader that stays permanently empty.
     book = get_object_or_404(Book, id=book_id)
-    if book.format != 'fb2':
+    if book.format not in dl.READABLE_FORMATS:
         raise Http404
 
     prefs = user_prefs(request.user)

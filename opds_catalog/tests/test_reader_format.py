@@ -1,4 +1,7 @@
-"""The in-browser reader only handles FB2; other formats must 404, not 500."""
+"""Which formats the in-browser reader offers, and what the rest do instead.
+
+FB2 and EPUB render; anything else must 404 rather than feed a binary container
+to the XML parser and 500."""
 import os
 
 import pytest
@@ -9,6 +12,7 @@ from opds_catalog.models import Book, Catalog
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 FB2 = '262001.fb2'
+EPUB = 'mirer.epub'
 
 
 @pytest.fixture
@@ -34,13 +38,20 @@ def make_book(cat, fmt, filename=FB2):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize('fmt', ['epub', 'mobi', 'pdf', 'djvu'])
+@pytest.mark.parametrize('fmt', ['mobi', 'pdf', 'djvu'])
 def test_reader_404s_for_formats_it_cannot_render(client, library, fmt):
     """Previously these reached lxml's ET.parse() on a binary container and
     raised, returning 500."""
     book = make_book(library, fmt)
     assert client.get(reverse('opds:read', args=[book.id])).status_code == 404
     assert client.get(reverse('web:read', args=[book.id])).status_code == 404
+
+
+@pytest.mark.django_db
+def test_an_epub_that_is_not_a_zip_404s_too(client, library):
+    """Format says epub, contents say otherwise."""
+    book = make_book(library, 'epub', filename=FB2)
+    assert client.get(reverse('opds:read', args=[book.id])).status_code == 404
 
 
 @pytest.mark.django_db
@@ -53,12 +64,23 @@ def test_reader_still_renders_fb2(client, library):
 
 
 @pytest.mark.django_db
-def test_book_list_offers_read_only_for_fb2(client, library):
+def test_reader_renders_epub(client, library):
+    book = make_book(library, 'epub', filename=EPUB)
+    resp = client.get(reverse('opds:read', args=[book.id]))
+    assert resp.status_code == 200
+    assert resp['Content-Type'].startswith('text/html')
+    assert client.get(reverse('web:read', args=[book.id])).status_code == 200
+
+
+@pytest.mark.django_db
+def test_book_list_offers_read_for_the_readable_formats_only(client, library):
     make_book(library, 'fb2')
-    make_book(library, 'epub')
+    make_book(library, 'epub', filename=EPUB)
+    make_book(library, 'pdf')
     body = client.get(reverse('web:searchbooks'), {'searchtype': 'm', 'searchterms': 'BOOK'}).content.decode()
 
-    fb2 = Book.objects.get(format='fb2')
-    epub = Book.objects.get(format='epub')
-    assert reverse('web:read', args=[fb2.id]) in body
-    assert reverse('web:read', args=[epub.id]) not in body
+    for fmt in ('fb2', 'epub'):
+        book = Book.objects.get(format=fmt)
+        assert reverse('web:read', args=[book.id]) in body, fmt
+    pdf = Book.objects.get(format='pdf')
+    assert reverse('web:read', args=[pdf.id]) not in body
