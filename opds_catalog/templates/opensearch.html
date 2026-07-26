@@ -1,10 +1,17 @@
 {% autoescape off %}
 <?xml version="1.0" encoding="utf-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
-    <ShortName>SimpleOPDS</ShortName>
-    <LongName>SimpleOPDS</LongName>
+    <ShortName>{{ title }}</ShortName>
+    <LongName>{{ title }}</LongName>
     <Url type="application/atom+xml" template="{% url "opds_catalog:opensearch" %}{searchTerms}/" />
-    <Image width="16" height="16">http://www.sopds.ru/favicon.ico</Image>
+    {% comment %}
+    Our own icon. This used to point at http://www.sopds.ru/favicon.ico, so every
+    reader that read the descriptor fetched an image from a third-party site over
+    plain HTTP — and showed nothing once that site was unreachable. Note the
+    {% templatetag opencomment %}..{% templatetag closecomment %} form is
+    single-line only; spanning lines with it emits the text verbatim.
+    {% endcomment %}
+    <Image width="16" height="16">{{ icon }}</Image>
     <Tags />
     <Contact />
     <Developer />
