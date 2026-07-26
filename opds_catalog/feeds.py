@@ -164,6 +164,8 @@ class MainFeed(AuthFeed):
 
     def items(self):
         mainitems = [
+                    {"id":7, "title":_("Recently added"), "link":"opds_catalog:newbooks",
+                     "descr": _("The newest books in the collection. Books: %(books)s."),"counters":{"books":Counter.objects.get_counter(models.counter_allbooks)}},
                     {"id":1, "title":_("By catalogs"), "link":"opds_catalog:catalogs",
                      "descr": _("Catalogs: %(catalogs)s, books: %(books)s."),"counters":{"catalogs":Counter.objects.get_counter(models.counter_allcatalogs),"books":Counter.objects.get_counter(models.counter_allbooks)}},
                     {"id":2, "title":_("By authors"), "link":("opds_catalog:lang_authors" if config.SOPDS_ALPHABET_MENU else "opds_catalog:nolang_authors"),
@@ -396,9 +398,11 @@ class SearchBooksFeed(AuthFeed):
     subtitle = settings.SUBTITLE
     
     def title(self, obj):
-        return "%s | %s (%s)"%(settings.TITLE,_("Books found"),_("doubles hide") if config.SOPDS_DOUBLES_HIDE else _("doubles show"))    
+        if obj["searchtype"] == 'n':
+            return "%s | %s"%(settings.TITLE,_("Recently added"))
+        return "%s | %s (%s)"%(settings.TITLE,_("Books found"),_("doubles hide") if config.SOPDS_DOUBLES_HIDE else _("doubles show"))
 
-    def get_object(self, request, searchtype="m", searchterms=None, searchterms0=None, page=1):   
+    def get_object(self, request, searchtype="m", searchterms=None, searchterms0=None, page=1):
         if not isinstance(page, int):
             page = int(page)
         page_num = page if page>0 else 1
@@ -446,12 +450,15 @@ class SearchBooksFeed(AuthFeed):
             except:
                 genre_id = 0
             books = Book.objects.filter(genres=genre_id).order_by('search_title','-docdate')    
-        # Поиск книг на книжной полке            
+        # Недавно добавленные книги (searchterms не используется)
+        elif searchtype == 'n':
+            books = Book.objects.all().order_by('-registerdate', '-id')
+        # Поиск книг на книжной полке
         elif searchtype == 'u':
             if config.SOPDS_AUTH:
                 books = Book.objects.filter(bookshelf__user=request.user).order_by('-bookshelf__readtime')
             else:
-                books=Book.objects.filter(id=0)  
+                books=Book.objects.filter(id=0)
         # Поиск дубликатов для книги            
         elif searchtype == 'd':
             try:

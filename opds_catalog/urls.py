@@ -30,12 +30,16 @@ urlpatterns = [
     re_path(r'^search/$',feeds.OpenSearch, name='opensearch'),
     #re_path(r'search/{searchTerms}/$',feeds.OpenSearch, name='search_template'),
 
-    re_path(r'^search/books/(?P<searchtype>[bmasgued])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
-    re_path(r'^search/books/(?P<searchtype>[bmasgued])/(?P<searchterms>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
+    re_path(r'^search/books/(?P<searchtype>[bmasguedn])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
+    re_path(r'^search/books/(?P<searchtype>[bmasguedn])/(?P<searchterms>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/(?P<searchterms0>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/(?P<searchterms0>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/$',feeds.SelectSeriesFeed(), name='searchbooks'),
     re_path(r'^search/books/u/0/$',feeds.SearchBooksFeed(), name='bookshelf'),
+    # Reverse-only alias, same trick as `bookshelf` above: the generic
+    # searchbooks patterns already match this path (searchtype 'n' with a dummy
+    # searchterms), the name just gives the term-less feed a no-argument target.
+    re_path(r'^search/books/n/0/$',feeds.SearchBooksFeed(), name='newbooks'),
 
     re_path(r'^search/authors/(?P<searchtype>[bme])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchAuthorsFeed(), name='searchauthors'),
     re_path(r'^search/authors/(?P<searchtype>[bme])/(?P<searchterms>.+)/$',feeds.SearchAuthorsFeed(), name='searchauthors'),

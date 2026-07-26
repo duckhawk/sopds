@@ -376,7 +376,11 @@ msgstr "Серии"
 msgid "Title"
 msgstr "Название"
 
-#: templates/sopds_nav.html:75 views.py:613
+#: templates/sopds_nav.html:75 views.py:206
+msgid "Recently added"
+msgstr "Недавно добавленные"
+
+#: templates/sopds_nav.html:76 views.py:613
 msgid "Catalogs"
 msgstr "Каталоги"
 

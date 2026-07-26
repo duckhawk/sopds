@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import F
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
@@ -56,7 +57,18 @@ class Book(models.Model):
     avail = models.IntegerField(null=False, default=0, db_index=True)
     authors = models.ManyToManyField('Author', through='bauthor')
     genres = models.ManyToManyField('Genre', through='bgenre')
-    series = models.ManyToManyField('Series', through='bseries')  
+    series = models.ManyToManyField('Series', through='bseries')
+
+    class Meta:
+        indexes = [
+            # Serves the "recently added" feed and page, which page through the
+            # whole catalogue ordered by registration date. Composite and
+            # descending so the ordering (including the id tiebreaker that keeps
+            # pagination stable for books registered in the same scan) is read
+            # straight off the index instead of sorting the table.
+            models.Index(F('registerdate').desc(), F('id').desc(),
+                         name='book_registerdate_desc'),
+        ]
 
 
 class Catalog(models.Model):
