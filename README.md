@@ -251,6 +251,23 @@ Next, you must first create a database "sopds" and a user with the necessary rig
 >     python3 manage.py sopds_util setconf SOPDS_FB2TOEPUB "convert/fb2conv/fb2epub"
 >     python3 manage.py sopds_util setconf SOPDS_FB2TOMOBI "convert/fb2conv/fb2mobi"
 
+4.4 Reading PDF and DjVu in the browser
+
+PDF opens in the in-browser reader with nothing to install. DjVu is converted to
+PDF first, by `ddjvu` from djvulibre:
+
+>     apt-get install djvulibre-bin
+
+The default setting already names it, so nothing else is needed:
+
+>     python3 manage.py sopds_util setconf SOPDS_DJVUTOPDF "ddjvu -format=pdf -quality=75 -skip"
+
+Without the program installed the catalogue simply does not offer DjVu as
+readable — it is still listed, searched and downloaded as before. Keep
+`-quality`: without it a photographic scan is converted to lossless raster and
+a hundred pages can come to a gigabyte. Converted books are cached under
+`SOPDS_TEMP_DIR`, oldest discarded first once they pass 512 MB.
+
 #### 5. Console commands Simple OPDS
 
 Show information about the book collection:

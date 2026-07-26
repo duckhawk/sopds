@@ -66,6 +66,9 @@ urlpatterns = [
     # Images referenced from a rendered EPUB. The path is matched loosely and
     # validated against the archive's own name list in the view.
     re_path(r'^read/(?P<book_id>[0-9]+)/res/(?P<path>.+)$', dl.ReadResource, name='readres'),
+    # What the paged reader draws: the book as a PDF, converted first if it is a
+    # DjVu. Separate from `read` because that one answers with rendered HTML.
+    re_path(r'^read/(?P<book_id>[0-9]+)/pdf/$', dl.PagedSource, name='pdfsource'),
 
     # OPDS 2.0 (JSON), alongside the Atom feeds rather than instead of them:
     # every e-reader still speaks 1.2, and the newer clients prefer this.

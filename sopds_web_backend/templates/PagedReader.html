@@ -1,0 +1,256 @@
+{% extends "sopds_main.html" %}
+{% load i18n %}
+{% load static %}
+{% comment %}
+The reader for books that are pages rather than text: PDF, and DjVu once the
+server has converted it. BookReader.html cannot show these — it lays out a flat
+stream of numbered paragraphs, and a scan has no paragraphs, only ink at fixed
+coordinates. What the two do share is the shelf: the page number is saved
+through the same setpos/getpos pair the flowing reader uses.
+{% endcomment %}
+{% block body %}
+<style>
+	#paged-book { text-align: center; }
+	#paged-book .pdf-page {
+		margin: 0 auto 0.8rem; background: #fff; position: relative;
+		box-shadow: 0 1px 5px rgba(0,0,0,.35);
+	}
+	#paged-book .pdf-page canvas { display: block; width: 100%; height: 100%; }
+	#paged-status { text-align: center; padding: 2rem 1rem; }
+	#paged-progress { position: fixed; left: 0; bottom: 0; width: 100%; height: 4px; background: rgba(127,127,127,0.25); z-index: 1000; }
+	#paged-progress .bar { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+	#paged-hud { position: fixed; right: 0.6rem; bottom: 0.8rem; z-index: 1001; text-align: right; font-size: 85%; }
+	#paged-hud .label { background: var(--accent); color: var(--accent-contrast); }
+	#paged-hud .button { margin: 0 0 .3rem 0; }
+</style>
+
+<div id="paged-hud" hidden>
+	<span>
+		<a class="button small" href="#" id="zoom-out" title="{% trans "Zoom out" %}">&minus;</a>
+		<a class="button small" href="#" id="zoom-fit" title="{% trans "Fit the width" %}">&#9707;</a>
+		<a class="button small" href="#" id="zoom-in" title="{% trans "Zoom in" %}">+</a><br>
+	</span>
+	<span class="label">{% trans "Page" %} <span id="page-label"></span></span>
+</div>
+<div id="paged-progress"><div class="bar"></div></div>
+<div id="paged-status">{% trans "Opening the book…" %}</div>
+<div id="paged-book"></div>
+{% endblock %}{# body #}
+
+{% block block-js %}
+<script type="module">
+import * as pdfjs from "{% static 'js/vendor/pdfjs/pdf.min.mjs' %}";
+
+// Everything else pdf.js loads at run time — the worker, the base-14 fonts, the
+// JBIG2/JPEG2000 decoders scanned books need — sits beside the module, so the
+// paths are derived from it rather than spelled out four more times.
+const ASSETS = new URL('.', new URL("{% static 'js/vendor/pdfjs/pdf.min.mjs' %}",
+                                    document.baseURI)).href;
+pdfjs.GlobalWorkerOptions.workerSrc = ASSETS + 'pdf.worker.min.mjs';
+
+const SOURCE  = "{% url 'opds_catalog:pdfsource' book_id %}";
+const SET_POS = "{% url 'web:setpos' book_id %}";
+const GET_POS = "{% url 'web:getpos' book_id %}";
+const FAILED  = "{% filter escapejs %}{% trans "This book could not be opened." %}{% endfilter %}";
+
+// A page canvas at a readable zoom is several megabytes. Keeping every page a
+// reader has passed through runs a tablet out of memory a hundred pages in, so
+// only a window around where they are is kept drawn.
+const KEEP_DRAWN = 8;
+const ZOOM_MIN = 0.25, ZOOM_MAX = 5, ZOOM_STEP = 1.25;
+
+const shelf  = document.getElementById('paged-book');
+const status = document.getElementById('paged-status');
+const hud    = document.getElementById('paged-hud');
+
+let doc = null;
+let pages = [];        // one entry per page, in order
+let zoom = 1;          // multiplier on top of "as wide as the column"
+let current = 1;
+let saveTimer = null, trimTimer = null, resizeTimer = null;
+
+function ratio() { return window.devicePixelRatio || 1; }
+
+/** The column, less the shadow, times whatever the reader has zoomed to. */
+function pageWidth() {
+	return Math.max(120, (shelf.clientWidth - 8) * zoom);
+}
+
+function docTop(el) {
+	// Not offsetTop: that is measured from the nearest positioned ancestor,
+	// which the page chrome may or may not provide.
+	return el.getBoundingClientRect().top + window.scrollY;
+}
+
+/** Size every placeholder, so the scrollbar is honest before anything is drawn. */
+function relayout() {
+	const width = pageWidth();
+	pages.forEach(function (p) {
+		p.el.style.width = Math.round(width) + 'px';
+		p.el.style.height = Math.round(width * p.ratio) + 'px';
+	});
+}
+
+function undraw(p) {
+	if (p.task) { p.task.cancel(); p.task = null; }
+	if (p.drawn) { p.el.replaceChildren(); p.drawn = false; }
+}
+
+/** Ask the observer to report again on pages that never stopped intersecting.
+ *
+ * Whatever is on screen has been discarded and has to be drawn afresh, but it
+ * has not moved in or out of view, so nothing would fire on its own. */
+function reobserve() {
+	pages.forEach(function (p) { watcher.unobserve(p.el); watcher.observe(p.el); });
+}
+
+/** Drop pages far from where the reader is, so memory stays bounded. */
+function trim() {
+	pages.forEach(function (p) {
+		if (Math.abs(p.n - current) > KEEP_DRAWN) undraw(p);
+	});
+}
+
+async function draw(p) {
+	if (p.drawn || p.task) return;
+
+	const page = await doc.getPage(p.n);
+	const unscaled = page.getViewport({ scale: 1 });
+
+	// The first page's shape stood in for every page; correct this one now that
+	// its real size is known, or a portrait book with one landscape plate jumps.
+	const shape = unscaled.height / unscaled.width;
+	if (Math.abs(shape - p.ratio) > 0.01) { p.ratio = shape; relayout(); }
+
+	const viewport = page.getViewport({ scale: pageWidth() / unscaled.width * ratio() });
+	const canvas = document.createElement('canvas');
+	canvas.width = Math.floor(viewport.width);
+	canvas.height = Math.floor(viewport.height);
+	canvas.style.width = '100%';
+	canvas.style.height = '100%';
+
+	p.task = page.render({ canvas: canvas, viewport: viewport });
+	try {
+		await p.task.promise;
+	} catch (err) {
+		p.task = null;
+		if (err && err.name === 'RenderingCancelledException') return;
+		throw err;
+	}
+	p.task = null;
+	p.drawn = true;
+	p.el.replaceChildren(canvas);
+}
+
+// Two screens either side, so turning a page finds it already drawn.
+const watcher = new IntersectionObserver(function (entries) {
+	entries.forEach(function (entry) {
+		if (entry.isIntersecting) draw(pages[Number(entry.target.dataset.page) - 1]);
+	});
+}, { rootMargin: '200% 0px' });
+
+/** Which page the reader is looking at: the first one still on screen. */
+function visiblePage() {
+	const top = window.scrollY;
+	for (let i = 0; i < pages.length; i++) {
+		const el = pages[i].el;
+		if (docTop(el) + el.offsetHeight > top) return i + 1;
+	}
+	return pages.length;
+}
+
+function onScroll() {
+	current = visiblePage();
+	document.getElementById('page-label').textContent = current + ' / ' + pages.length;
+
+	const span = document.documentElement.scrollHeight - window.innerHeight;
+	const percent = span > 0 ? Math.min(100, Math.max(0, window.scrollY / span * 100)) : 100;
+	document.querySelector('#paged-progress .bar').style.width = percent.toFixed(1) + '%';
+
+	clearTimeout(saveTimer);
+	saveTimer = setTimeout(savePosition, 1000);
+	clearTimeout(trimTimer);
+	trimTimer = setTimeout(trim, 2000);
+}
+
+function savePosition() {
+	// The same endpoint the flowing reader uses. It stores the position as text
+	// and accepts digits and dots, which a page number is.
+	fetch(SET_POS + '?pos=' + current, { credentials: 'same-origin' }).catch(function () {});
+}
+
+async function restorePosition() {
+	try {
+		const saved = await (await fetch(GET_POS, { credentials: 'same-origin' })).text();
+		const page = parseInt(saved, 10);
+		if (page > 1 && page <= pages.length) {
+			window.scrollTo(0, docTop(pages[page - 1].el));
+		}
+	} catch (err) { /* an unremembered position is not a failure */ }
+	onScroll();
+}
+
+function redrawAt(anchor) {
+	pages.forEach(undraw);
+	relayout();
+	window.scrollTo(0, docTop(pages[anchor - 1].el));
+	reobserve();
+}
+
+function setZoom(next) {
+	const wanted = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+	if (wanted === zoom || !pages.length) return;
+	zoom = wanted;
+	redrawAt(current);
+}
+
+async function open() {
+	doc = await pdfjs.getDocument({
+		url: SOURCE,
+		standardFontDataUrl: ASSETS + 'standard_fonts/',
+		wasmUrl: ASSETS + 'wasm/',
+		iccUrl: ASSETS + 'iccs/',
+		// Fetch the pages being looked at rather than the whole book: the
+		// content route answers Range requests, and a scan is large.
+		disableAutoFetch: true,
+	}).promise;
+
+	const shape = (await doc.getPage(1)).getViewport({ scale: 1 });
+	for (let n = 1; n <= doc.numPages; n++) {
+		const el = document.createElement('div');
+		el.className = 'pdf-page';
+		el.dataset.page = n;
+		shelf.appendChild(el);
+		pages.push({ n: n, el: el, ratio: shape.height / shape.width, task: null, drawn: false });
+		watcher.observe(el);
+	}
+
+	status.hidden = true;
+	hud.hidden = false;
+	relayout();
+	await restorePosition();
+}
+
+window.addEventListener('scroll', onScroll);
+// Rotating a tablet changes how wide a page is, so what is drawn is the wrong
+// size. Debounced: a desktop window drag fires this continuously.
+window.addEventListener('resize', function () {
+	clearTimeout(resizeTimer);
+	resizeTimer = setTimeout(function () { if (pages.length) redrawAt(current); }, 250);
+});
+document.getElementById('zoom-in').addEventListener('click', function (e) {
+	e.preventDefault(); setZoom(zoom * ZOOM_STEP);
+});
+document.getElementById('zoom-out').addEventListener('click', function (e) {
+	e.preventDefault(); setZoom(zoom / ZOOM_STEP);
+});
+document.getElementById('zoom-fit').addEventListener('click', function (e) {
+	e.preventDefault(); setZoom(1);
+});
+
+open().catch(function (err) {
+	console.error(err);
+	status.textContent = FAILED;
+});
+</script>
+{% endblock %}{# block-js #}

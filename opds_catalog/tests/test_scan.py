@@ -161,9 +161,12 @@ class scanTestCase(TestCase):
         opdsdb.clear_all()
         scanner = opdsScanner()
         scanner.scan_all()
-        self.assertEqual(scanner.books_added, 6)
+        # Eight: the six with metadata, plus the PDF and the DjVu the paged
+        # reader is tested against. Those two carry nothing a parser can read,
+        # so they add to the book count and to nothing else.
+        self.assertEqual(scanner.books_added, 8)
         self.assertEqual(scanner.bad_books, 1)
-        self.assertEqual(Book.objects.all().count(), 6)
+        self.assertEqual(Book.objects.all().count(), 8)
         self.assertEqual(Author.objects.all().count(), 6)
         self.assertEqual(Genre.objects.all().count(), 5)
         self.assertEqual(Series.objects.all().count(), 1)
