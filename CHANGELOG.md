@@ -165,6 +165,17 @@ All notable changes to this project are documented here. The format is based on
   slow (lost Index-Only Scan) until autovacuum catches up.
 
 ### Security
+- **Catalogue content was reachable without authentication.** With
+  `SOPDS_AUTH` on, the OPDS feeds and `/opds/download/` correctly answered
+  401, but `/opds/cover/`, `/opds/thumb/`, `/opds/convert/` and — worst of the
+  four — `/opds/read/` did not: the reader route handed out the **full text of
+  any book** to anyone who knew (or guessed) an id, and the cover routes
+  exposed cover art, which usually carries the title and author. All four now
+  go through the same `require_catalog_access` guard `Download` had inline,
+  accepting either a session login or OPDS Basic auth. The check runs outside
+  the cover ETag and cache, so an anonymous request cannot spend CPU
+  unzipping books or populate the cache either. The book-less no-cover
+  placeholder stays open — it carries nothing from the catalogue.
 - Brute-force throttle on the web login form: after 10 failed attempts per
   client IP the login is locked out for 5 minutes (shared cache, so it holds
   across workers). A successful login clears the counter.

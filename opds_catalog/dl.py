@@ -7,6 +7,7 @@ import io
 import shlex
 import subprocess
 import lxml.etree as ET
+from functools import wraps
 from re import search
 import logging
 
@@ -37,6 +38,28 @@ logger = logging.getLogger(__name__)
 # tiny-but-huge-dimension image raises DecompressionBombError instead of
 # allocating gigabytes (real covers are far below this).
 Image.MAX_IMAGE_PIXELS = 64_000_000
+
+
+def require_catalog_access(view):
+    """Refuse anonymous access to catalogue content while SOPDS_AUTH is on.
+
+    Factored out of `Download`, which had the only copy of this. A session login
+    counts, and so does OPDS Basic auth: e-readers fetch cover art with the same
+    credentials they use for the feed and cannot carry a session cookie.
+
+    Note this runs *outside* the ETag and the cache, so an unauthenticated
+    request is turned away before it can consume either.
+    """
+    @wraps(view)
+    def _wrapped(request, *args, **kwargs):
+        if config.SOPDS_AUTH and not request.user.is_authenticated:
+            # Returns the request (with .user set) on success, a 401 otherwise.
+            result = BasicAuthMiddleware().process_request(request)
+            if result is not None and not hasattr(result, 'user'):
+                return result
+        return view(request, *args, **kwargs)
+
+    return _wrapped
 
 
 def container_path(book):
@@ -248,18 +271,13 @@ def getFileDataMobi(book):
     return getFileDataConv(book,'mobi')
 
 
+@require_catalog_access
 def Download(request, book_id, zip_flag):
     """ Загрузка файла книги """
     book = get_object_or_404(Book, id=book_id)
 
-    if config.SOPDS_AUTH:
-        if not request.user.is_authenticated:
-            bau = BasicAuthMiddleware()
-            request = bau.process_request(request)
-            if not hasattr(request, 'user'):
-                return request
-        if request.user.is_authenticated:
-            bookshelf.objects.get_or_create(user=request.user, book=book)
+    if config.SOPDS_AUTH and request.user.is_authenticated:
+        bookshelf.objects.get_or_create(user=request.user, book=book)
 
     full_path=os.path.join(config.SOPDS_ROOT_LIB,book.path)
     
@@ -387,6 +405,7 @@ def extract_cover(book, thumbnail=False):
 # The cache is keyed on the ETag, not on the URL as `cache_page` was: the
 # validator tracks the file's mtime, so replacing a book in place now yields a
 # new key instead of serving the previous cover until the TTL ran out.
+@require_catalog_access
 @etag(cover_etag)
 def Cover(request, book_id, thumbnail=False):
     """ Загрузка обложки """
@@ -489,6 +508,7 @@ def NoCover(request):
     return response
 
 
+@require_catalog_access
 def ConvertFB2(request, book_id, convert_type):
     """ Выдача файла книги после конвертации в EPUB или mobi """
     book = get_object_or_404(Book, id=book_id)
@@ -574,6 +594,7 @@ def ConvertFB2(request, book_id, convert_type):
     return response
 
 
+@require_catalog_access
 def ReadFB2(request, book_id):
     """ Загрузка книги """
     book = get_object_or_404(Book, id=book_id)
