@@ -1,0 +1,80 @@
+{% extends "sopds_main.html" %}
+{% load i18n %}
+
+{% block body %}
+<div class="large-12 column">
+
+  <form onsubmit="collectionCreate();return false;" style="margin-bottom:1rem;">
+    <div class="input-group">
+      <input class="input-group-field" type="text" id="new-collection" maxlength="100"
+             placeholder="{% trans "Name a new list" %}" required>
+      <div class="input-group-button">
+        <button class="button" type="submit">{% trans "Create" %}</button>
+      </div>
+    </div>
+  </form>
+
+  {% if items %}
+  <table>
+    {% for c in items %}
+    <tr>
+      <td>
+        <a href="{% url "web:searchbooks" %}?searchtype=c&searchterms={{ c.id }}">{{ c.name }}</a>
+        <span class="secondary label small">{{ c.book_count }}</span>
+        {% if c.user_id != user.id %}
+          {# Someone else's, visible because they shared it. #}
+          <span style="font-size:80%;opacity:.7;">{% blocktrans with who=c.user.username %}shared by {{ who }}{% endblocktrans %}</span>
+        {% elif c.shared %}
+          <span class="label small">{% trans "shared" %}</span>
+        {% endif %}
+      </td>
+      <td style="text-align:right;white-space:nowrap;">
+        {% if c.user_id == user.id %}
+          <a href="#" onclick="collectionShare({{ c.id }}, {% if c.shared %}0{% else %}1{% endif %});return false;">
+            <span class="secondary label small">{% if c.shared %}{% trans "Unshare" %}{% else %}{% trans "Share" %}{% endif %}</span></a>
+          <a href="#" onclick="collectionDelete({{ c.id }}, '{{ c.name|escapejs }}');return false;">
+            <span class="alert label small">{% trans "Delete" %}</span></a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p>{% trans "No lists yet. Create one above, then add books from their cards." %}</p>
+  {% endif %}
+</div>
+{% endblock %}{# body #}
+
+{% block block-js %}
+<script>
+	function ccCookie(name){
+		var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+		return m ? m.pop() : '';
+	}
+	function ccPost(url, data, cb){
+		var body = Object.keys(data).map(function(k){
+			return encodeURIComponent(k) + '=' + encodeURIComponent(data[k]); }).join('&');
+		fetch(url, {method:'POST',
+			headers:{'X-CSRFToken': ccCookie('csrftoken'),
+			         'Content-Type':'application/x-www-form-urlencoded'},
+			body: body}).then(function(r){ return r.json(); }).then(cb).catch(function(){});
+	}
+	function collectionCreate(){
+		var input = document.getElementById('new-collection');
+		if (!input.value.trim()) return;
+		ccPost("{% url 'web:collection_create' %}", {name: input.value}, function(res){
+			if (res && res.ok) location.reload();
+			else alert((res && res.error) || "{% trans "That list could not be created." %}");
+		});
+	}
+	function collectionShare(id, shared){
+		ccPost("{% url 'web:collection_share' 0 %}".replace('/0/', '/' + id + '/'),
+		       {shared: shared}, function(){ location.reload(); });
+	}
+	function collectionDelete(id, name){
+		if (!confirm("{% trans "Delete this list?" %} " + name)) return;
+		ccPost("{% url 'web:collection_delete' 0 %}".replace('/0/', '/' + id + '/'),
+		       {}, function(){ location.reload(); });
+	}
+</script>
+{% endblock %}

@@ -22,6 +22,18 @@ All notable changes to this project are documented here. The format is based on
   than guessed at.
 
 ### Added
+- **Collections** — named lists of books belonging to a reader, with their own
+  page, OPDS feed and search type (`c`), and a picker on the book card.
+  Migration `0028`. Deliberately a third thing rather than a variation on the
+  other two: the bookshelf is an automatic record of what you opened, tags are
+  shared metadata about the book, and a collection is a grouping that means
+  something only to whoever made it.
+  Private unless shared. A list nobody else can see is still useful for
+  organising your own reading, but in a library several people use the
+  interesting thing about a list is being able to hand it over — so sharing is
+  a flag rather than a separate feature. **Sharing grants reading, never
+  writing**, and someone else's private list answers 404 rather than 403, so
+  its existence is not confirmed either.
 - **Tags.** Genres arrive with the book files and follow a taxonomy nobody in
   this library chose; tags are the other half — whatever its readers find worth
   marking, which no parser will ever produce. They go on the book card, get

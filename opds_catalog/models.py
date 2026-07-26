@@ -32,6 +32,7 @@ SIZE_GENRE_SUBSECTION = 100
 
 SIZE_SERIES          = 150
 SIZE_TAG             = 64
+SIZE_COLLECTION      = 100
 
 
 LangCodes = {1:'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЫЪЭЮЯабвгдеёжзийклмнопрстуфхцчшщьыъэюя',
@@ -127,6 +128,51 @@ class bseries(models.Model):
 #        index_together = [
 #            ["book", "ser"],
 #        ]
+
+
+class Collection(models.Model):
+    """A named list of books belonging to one reader.
+
+    Distinct from both neighbours. The bookshelf is a single automatic record
+    of what you have opened; tags are shared metadata describing the book
+    itself. A collection is a deliberate grouping that means something only to
+    the person who made it — "for the holiday", "to lend to Dima", "the ones
+    worth rereading".
+
+    Private unless shared. A list nobody else can see is still useful for
+    organising your own reading, but in a library several people use, the
+    interesting thing about a collection is being able to hand it to them —
+    hence the flag rather than two separate features.
+    """
+    user = models.ForeignKey(User, db_index=True, on_delete=models.CASCADE,
+                             related_name='collections')
+    name = models.CharField(max_length=SIZE_COLLECTION)
+    shared = models.BooleanField(default=False)
+    created = models.DateTimeField(default=timezone.now)
+    books = models.ManyToManyField('Book', through='CollectionBook')
+
+    class Meta:
+        # One reader cannot have two lists of the same name; two readers can.
+        unique_together = ['user', 'name']
+        ordering = ['name']
+
+    def visible_to(self, user):
+        return self.shared or (user.is_authenticated and self.user_id == user.pk)
+
+    def __str__(self):
+        return '%s/%s' % (self.user.username, self.name)
+
+
+class CollectionBook(models.Model):
+    collection = models.ForeignKey('Collection', db_index=True, on_delete=models.CASCADE)
+    book = models.ForeignKey('Book', db_index=True, on_delete=models.CASCADE)
+    added = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ['collection', 'book']
+        # Insertion order: a reader builds a list by adding to it, so that is
+        # the order it means something in.
+        ordering = ['added', 'id']
 
 
 class Tag(models.Model):

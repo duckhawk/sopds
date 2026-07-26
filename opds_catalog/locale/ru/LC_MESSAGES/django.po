@@ -194,6 +194,15 @@ msgstr "Метки, которые читатели поставили книг�
 msgid "Tags"
 msgstr "Теги"
 
+#: .\opds_catalog\feeds.py:179
+msgid "Collections"
+msgstr "Подборки"
+
+#: .\opds_catalog\feeds.py:180
+#, python-format
+msgid "Lists of books. Collections: %(collections)s."
+msgstr "Списки книг. Подборок: %(collections)s."
+
 #: .\opds_catalog\feeds.py:357 .\opds_catalog\tests\test_feeds.py:60
 msgid "Search by titles"
 msgstr "Поиск по наименованиям"

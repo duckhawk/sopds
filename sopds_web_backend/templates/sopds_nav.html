@@ -77,6 +77,7 @@
       <li {% if searchtype == "r" %}class="active"{% endif %}><a href="{% url "web:searchbooks" %}?searchtype=r">{% trans "Top rated" %}</a></li>
       <li {% if searchtype == "p" %}class="active"{% endif %}><a href="{% url "web:searchbooks" %}?searchtype=p">{% trans "Most popular" %}</a></li>
       <li {% if current == "tags" %}class="active"{% endif %}><a href="{% url "web:tags" %}">{% trans "Tags" %}</a></li>
+      {% if user.is_authenticated %}<li {% if current == "collections" %}class="active"{% endif %}><a href="{% url "web:collections" %}">{% trans "Lists" %}</a></li>{% endif %}
       <li {% if current == "catalog" %}class="active"{% endif %}><a href="{% url "web:catalog" %}">{% trans "Catalogs" %}</a></li>
 
       {% if not alphabet %}

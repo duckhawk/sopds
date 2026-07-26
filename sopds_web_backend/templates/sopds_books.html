@@ -100,6 +100,16 @@
 				{% if b.readtime %}
                     <b>{% trans "Read date:" %}</b> <span class="label small">{{ b.readtime.0.readtime }}</span><br>
 				{% endif %}
+				{% if my_collections %}
+				<b>{% trans "Lists:" %}</b>
+				<select onchange="collectionToggle({{ b.id }}, this);" style="width:auto;display:inline-block;height:auto;padding:.1rem .3rem;font-size:100%;">
+					<option value="">{% trans "Add to a list…" %}</option>
+					{% for c in my_collections %}
+					<option value="{{ c.id }}" {% if c.id in b.in_collections %}data-on="1"{% endif %}>{% if c.id in b.in_collections %}✓ {% endif %}{{ c.name }}</option>
+					{% endfor %}
+				</select>
+				<br>
+				{% endif %}
 				<b>{% trans "Tags:" %}</b>
 				<span class="bk-tags" data-book="{{ b.id }}">
 				{% for t in b.tags %}<span class="label small" data-tag="{{ t.id }}"><a href="{% url "web:searchbooks" %}?searchtype=t&searchterms={{ t.id }}" style="color:inherit;">{{ t.name }}</a>{% if b.tags_editable %} <a href="#" onclick="tagRemove({{ b.id }},{{ t.id }});return false;" title="{% trans "Remove" %}">&times;</a>{% endif %}</span> {% endfor %}
@@ -205,6 +215,21 @@
 			if (res && res.ok){ c.setAttribute('data-rating', res.rating || 0); bsRenderStars(c); }
 		});
 	}
+	var COLL_ADD_URL = "{% url 'web:collection_add' 0 0 %}";
+	var COLL_DEL_URL = "{% url 'web:collection_remove' 0 0 %}";
+
+	// One control for both directions: picking a list the book is already on
+	// takes it off again, which is what the tick in the option means.
+	function collectionToggle(bookId, select){
+		var option = select.options[select.selectedIndex];
+		var collectionId = option.value;
+		if (!collectionId) return;
+		var on = option.getAttribute('data-on') === '1';
+		var url = (on ? COLL_DEL_URL : COLL_ADD_URL)
+			.replace('/0/', '/' + collectionId + '/').replace('/0/', '/' + bookId + '/');
+		bsPost(url, {}, function(){ location.reload(); });
+	}
+
 	var TAG_ADD_URL = "{% url 'web:tag_add' 0 %}";
 	var TAG_DEL_URL = "{% url 'web:tag_remove' 0 %}";
 

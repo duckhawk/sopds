@@ -563,6 +563,58 @@ msgstr "Не удалось добавить тег."
 msgid "Tag editing is disabled."
 msgstr "Редактирование тегов отключено."
 
+#: templates/sopds_nav.html:80
+msgid "Lists"
+msgstr "Списки"
+
+#: templates/sopds_collections.html:3 views.py:283
+msgid "Collections"
+msgstr "Подборки"
+
+#: templates/sopds_books.html:97
+msgid "Lists:"
+msgstr "Списки:"
+
+#: templates/sopds_books.html:99
+msgid "Add to a list…"
+msgstr "Добавить в список…"
+
+#: templates/sopds_collections.html:10
+msgid "Name a new list"
+msgstr "Название нового списка"
+
+#: templates/sopds_collections.html:12
+msgid "Create"
+msgstr "Создать"
+
+#: templates/sopds_collections.html:27
+msgid "shared"
+msgstr "общий"
+
+#: templates/sopds_collections.html:33
+msgid "Share"
+msgstr "Поделиться"
+
+#: templates/sopds_collections.html:33
+msgid "Unshare"
+msgstr "Сделать личным"
+
+#: templates/sopds_collections.html:35
+msgid "Delete"
+msgstr "Удалить список"
+
+#: templates/sopds_collections.html:42
+msgid "No lists yet. Create one above, then add books from their cards."
+msgstr "Списков пока нет. Создайте первый выше, затем добавляйте книги с карточек."
+
+#: templates/sopds_collections.html:75
+msgid "Delete this list?"
+msgstr "Удалить этот список?"
+
+#: views.py:900
+msgid "That list could not be created."
+msgstr "Не удалось создать список."
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"
