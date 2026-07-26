@@ -22,6 +22,19 @@ All notable changes to this project are documented here. The format is based on
   than guessed at.
 
 ### Added
+- **Tags.** Genres arrive with the book files and follow a taxonomy nobody in
+  this library chose; tags are the other half — whatever its readers find worth
+  marking, which no parser will ever produce. They go on the book card, get
+  their own browse page and OPDS feed, and are a search type (`t`) in both.
+  Migration `0027`.
+  Library-wide rather than per-reader, like genres and unlike ratings: the
+  point is a shared organisation of a shared shelf. That does mean any
+  signed-in reader can retag a book, which is fine among people who share a
+  library and less so once registration is open — so `SOPDS_TAGS_EDITABLE`
+  closes editing without hiding the tags. Names match case-insensitively, so
+  "Book club" and "book club" are one tag rather than the two that quietly
+  wreck a shared vocabulary, and a tag nothing carries any more is deleted
+  rather than left in the browse list matching nothing.
 - **OPDS 2.0 (JSON) feeds**, under `/opds/2.0/`, alongside the Atom ones rather
   than instead of them: every e-reader still speaks 1.2, and the newer clients
   — Thorium, Foliate, recent Aldiko — prefer or require 2.0. A navigation root,

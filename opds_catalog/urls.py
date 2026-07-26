@@ -27,11 +27,13 @@ urlpatterns = [
     re_path(r'^genres/$',feeds.GenresFeed(), name='genres'),
     re_path(r'^genres/(?P<section>\d+)/$',feeds.GenresFeed(), name='genres'),
 
+    re_path(r'^tags/$',feeds.TagsFeed(), name='tags'),
+
     re_path(r'^search/$',feeds.OpenSearch, name='opensearch'),
     #re_path(r'search/{searchTerms}/$',feeds.OpenSearch, name='search_template'),
 
-    re_path(r'^search/books/(?P<searchtype>[bmasguednxrp])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
-    re_path(r'^search/books/(?P<searchtype>[bmasguednxrp])/(?P<searchterms>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
+    re_path(r'^search/books/(?P<searchtype>[bmasguednxrpt])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
+    re_path(r'^search/books/(?P<searchtype>[bmasguednxrpt])/(?P<searchterms>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/(?P<searchterms0>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/(?P<searchterms0>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/$',feeds.SelectSeriesFeed(), name='searchbooks'),

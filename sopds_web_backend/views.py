@@ -18,11 +18,11 @@ from django.http import HttpResponseForbidden, HttpResponseRedirect
 
 
 from opds_catalog import models
-from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalog, Genre, lang_menu, Theme
+from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalog, Genre, Tag, lang_menu, Theme
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
-from opds_catalog import delivery, dl, ratings, stats, throttle
+from opds_catalog import delivery, dl, ratings, stats, tags, throttle
 from constance import config
 from sopds_web_backend import oidc
 from sopds import email as mail
@@ -263,6 +263,17 @@ def SearchBooksView(request):
             args['breadcrumbs'] = [_('Books'), _('Top rated')]
             args['searchobject'] = 'title'
 
+        # Книги с заданным тегом
+        elif searchtype == 't':
+            try:
+                tag_id = int(searchterms)
+                tag = Tag.objects.get(id=tag_id)
+            except (TypeError, ValueError, Tag.DoesNotExist):
+                raise Http404
+            books = tags.books_with(tag_id)
+            args['breadcrumbs'] = [_('Books'), _('Tag'), tag.name]
+            args['searchobject'] = 'title'
+
         # Самые скачиваемые книги (searchterms не используется)
         elif searchtype == 'p':
             books = stats.most_popular()
@@ -372,6 +383,7 @@ def SearchBooksView(request):
         # One query for the whole page, keyed on ids we already have.
         page_ratings = ratings.summary(r.id for r in page_rows)
         page_stats = stats.summary(r.id for r in page_rows)
+        page_tags = tags.for_books(r.id for r in page_rows)
         # One check for the page, not one per book: it depends on the reader
         # and the server, never on the book.
         can_send = delivery.can_send(request.user)
@@ -404,6 +416,8 @@ def SearchBooksView(request):
                  'stat': page_stats.get(row.id),
                  'readable': row.format in dl.READABLE_FORMATS,
                  'sendable': can_send,
+                 'tags': page_tags.get(row.id, []),
+                 'tags_editable': config.SOPDS_TAGS_EDITABLE,
                  # Percentage read, as reported by an e-reader over kosync.
                  'percent': user_shelf[0].percent if user_shelf else None
                  }
@@ -981,6 +995,57 @@ def BSSetStatus(request, book_id):
     obj.status = status
     obj.save(update_fields=['status'])
     return JsonResponse({'ok': True, 'status': status})
+
+
+@sopds_login(url='web:login')
+@personal_view
+def TagAdd(request, book_id):
+    """Put a label on a book. POST only — it changes shared metadata."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    if not config.SOPDS_TAGS_EDITABLE:
+        return JsonResponse({'ok': False, 'error': str(_('Tag editing is disabled.'))}, status=403)
+
+    book = get_object_or_404(Book, id=book_id)
+    tag = tags.add(book, request.POST.get('name', ''))
+    if tag is None:
+        return JsonResponse({'ok': False, 'error': str(_('That tag could not be added.'))},
+                            status=400)
+    return JsonResponse({'ok': True, 'id': tag.id, 'name': tag.name})
+
+
+@sopds_login(url='web:login')
+@personal_view
+def TagRemove(request, book_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    if not config.SOPDS_TAGS_EDITABLE:
+        return JsonResponse({'ok': False, 'error': str(_('Tag editing is disabled.'))}, status=403)
+
+    book = get_object_or_404(Book, id=book_id)
+    try:
+        tag_id = int(request.POST.get('tag'))
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False}, status=400)
+    return JsonResponse({'ok': tags.remove(book, tag_id)})
+
+
+@vary_on_headers("HTTP_ACCEPT_LANGUAGE")
+@sopds_login(url='web:login')
+def TagsView(request):
+    """Every tag in use, with how many books carry it."""
+    return render(request, 'sopds_tags.html', {
+        'items': tags.in_use(),
+        'current': 'tags',
+        'breadcrumbs': [_('Tags')],
+        'cache_id': 'tags',
+        # Not cached: the key would be constant while the content changes the
+        # moment anyone tags a book, so the list would sit stale for a whole
+        # TTL. It is one grouped query over a small table — cheap enough to
+        # just run.
+        'cache_t': 0,
+        'css_file': theme_css(request.user),
+    })
 
 
 @sopds_login(url='web:login')
