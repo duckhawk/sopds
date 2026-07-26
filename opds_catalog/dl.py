@@ -6,6 +6,7 @@ import hashlib
 import io
 import shlex
 import subprocess
+import contextlib
 import lxml.etree as ET
 import mimetypes
 import posixpath
@@ -46,6 +47,14 @@ Image.MAX_IMAGE_PIXELS = 64_000_000
 # plates are far below this; the cap stops a crafted archive from making the
 # reader page pull a multi-gigabyte member.
 MAX_RESOURCE_BYTES = 32 * 1024 * 1024
+
+# Illustrations at or below this go into the shared cache; anything larger is
+# streamed straight from the archive rather than evicting everything else.
+MAX_CACHED_RESOURCE_BYTES = 1024 * 1024
+
+# A rendered book is a few hundred kilobytes of HTML, which is worth caching;
+# an enormous one is not worth pushing everything else out of the cache for.
+MAX_CACHED_RENDER_BYTES = 4 * 1024 * 1024
 
 
 def require_catalog_access(view):
@@ -91,16 +100,21 @@ def container_path(book):
     return full_path
 
 
-def compute_cover_etag(book_id, thumbnail=False):
-    """Validator for the cover/thumbnail views, computed without opening the book.
+def compute_content_etag(book_id, variant):
+    """Validator for anything derived from a book file, without opening it.
 
-    Extracting a cover means unzipping and parsing the book, so the point of the
-    ETag is to answer a revalidation with 304 *before* any of that happens. The
-    validator therefore uses only what a single `stat()` gives us: the size and
-    mtime of the containing file, plus the entry that identifies the book inside
-    it. The scanner keys books on (filename, path) and never refreshes the row
-    when a file is replaced in place, so `Book.filesize` cannot be trusted here —
-    the on-disk mtime can.
+    Deriving a cover means unzipping and parsing the book; rendering an EPUB
+    means parsing every document in it. The point of the ETag is to answer a
+    revalidation with 304 *before* any of that happens, so the validator uses
+    only what a single `stat()` gives us: the size and mtime of the containing
+    file, plus the entry that identifies the book inside it. The scanner keys
+    books on (filename, path) and never refreshes the row when a file is
+    replaced in place, so `Book.filesize` cannot be trusted here — the on-disk
+    mtime can.
+
+    `variant` distinguishes the different things derived from the same file (a
+    cover, a thumbnail, the rendered text, one illustration) so they cannot
+    collide in a shared cache.
 
     Returns None (no ETag, no conditional handling, no caching) when the book or
     its file is gone; those paths end in a 404 or the no-cover placeholder.
@@ -111,30 +125,62 @@ def compute_cover_etag(book_id, thumbnail=False):
     except (Book.DoesNotExist, OSError):
         return None
 
-    key = '%s|%s|%s|%s|%s' % (
-        book_id, book.filename, st.st_size, st.st_mtime_ns,
-        settings.THUMB_SIZE if thumbnail else 'full',
-    )
+    key = '%s|%s|%s|%s|%s' % (book_id, book.filename, st.st_size,
+                              st.st_mtime_ns, variant)
     return '"%s"' % hashlib.sha256(key.encode('utf-8')).hexdigest()[:32]
 
 
-def cover_etag(request, book_id, thumbnail=False):
-    """`compute_cover_etag`, memoised for the duration of one request.
+def content_etag(request, book_id, variant):
+    """`compute_content_etag`, memoised for the duration of one request.
 
     The validator is needed twice per request — once by the `etag` decorator to
     answer conditional GETs, once by the view as its cache key — and each call
     costs a query plus a stat. Caching it on the request keeps that at one.
     """
-    memo = (book_id, bool(thumbnail))
-    if request is not None and getattr(request, '_cover_etag_for', None) == memo:
-        return request._cover_etag
+    memo = (book_id, variant)
+    if request is not None and getattr(request, '_content_etag_for', None) == memo:
+        return request._content_etag
 
-    value = compute_cover_etag(book_id, thumbnail)
+    value = compute_content_etag(book_id, variant)
     if request is not None:
-        request._cover_etag_for = memo
-        request._cover_etag = value
+        request._content_etag_for = memo
+        request._content_etag = value
 
     return value
+
+
+def cover_etag(request, book_id, thumbnail=False):
+    return content_etag(request, book_id,
+                        settings.THUMB_SIZE if thumbnail else 'full')
+
+
+def read_etag(request, book_id):
+    return content_etag(request, book_id, 'read')
+
+
+def resource_etag(request, book_id, path):
+    return content_etag(request, book_id, 'res:%s' % path)
+
+
+@contextlib.contextmanager
+def open_book_archive(book):
+    """A ZipFile over the book itself.
+
+    For a plain catalogue entry the book *is* the archive, so it is opened from
+    disk and only the members actually read get decompressed. Only a book stored
+    inside another zip has to be pulled into memory first — `getFileData` reads
+    the whole thing, which is why this is not used unconditionally.
+    """
+    if book.cat_type == opdsdb.CAT_NORMAL:
+        with zipfile.ZipFile(container_path(book)) as archive:
+            yield archive
+        return
+
+    data = getFileData(book)
+    if data is None:
+        raise Http404
+    with zipfile.ZipFile(data) as archive:
+        yield archive
 
 
 def nocover_response():
@@ -609,6 +655,7 @@ READABLE_FORMATS = ('fb2', 'epub')
 
 
 @require_catalog_access
+@etag(read_etag)
 def Read(request, book_id):
     """Dispatch to the renderer for this book's format."""
     book = get_object_or_404(Book, id=book_id)
@@ -618,28 +665,41 @@ def Read(request, book_id):
 
 
 def render_epub(request, book):
-    """ Чтение EPUB в браузере. Not a route: reached through `Read`. """
+    """ Чтение EPUB в браузере. Not a route: reached through `Read`.
+
+    Rendering means unzipping the book and parsing, sanitising and serialising
+    every document in its spine — a few hundred kilobytes of HTML out of dozens
+    of parses. Doing that per page view is what the cache is for; it is keyed on
+    the same content validator as the ETag, so replacing the file on disk
+    invalidates the render at once.
+    """
     if config.SOPDS_AUTH and request.user.is_authenticated:
         bookshelf.objects.get_or_create(user=request.user, book=book)
 
-    data = getFileData(book)
-    if data is None:
-        raise Http404
+    validator = read_etag(request, book.id)
+    cache_key = 'sopds-epub:%s' % validator.strip('"') if validator else None
 
-    def resource_url(path):
-        return reverse('opds_catalog:readres',
-                       kwargs={'book_id': book.id, 'path': path})
+    html = cache.get(cache_key) if cache_key else None
+    if html is None:
+        def resource_url(path):
+            return reverse('opds_catalog:readres',
+                           kwargs={'book_id': book.id, 'path': path})
+        try:
+            with open_book_archive(book) as archive:
+                html = epub_render.render_archive(archive, resource_url)
+        except (epub_render.EpubError, zipfile.BadZipFile, KeyError, OSError) as err:
+            logger.warning('Cannot render EPUB for book %s: %s', book.id, err)
+            raise Http404
+        if cache_key and len(html) <= MAX_CACHED_RENDER_BYTES:
+            cache.set(cache_key, html, config.SOPDS_CACHE_TIME)
 
-    try:
-        html = epub_render.render(data, resource_url)
-    except (epub_render.EpubError, zipfile.BadZipFile, KeyError) as err:
-        logger.warning('Cannot render EPUB for book %s: %s', book.id, err)
-        raise Http404
-
-    return HttpResponse(html, content_type='text/html; charset=utf-8')
+    response = HttpResponse(html, content_type='text/html; charset=utf-8')
+    patch_cache_control(response, private=True, max_age=config.SOPDS_CACHE_TIME)
+    return response
 
 
 @require_catalog_access
+@etag(resource_etag)
 def ReadResource(request, book_id, path):
     """Serve one image from inside an EPUB, for the rendered reader page.
 
@@ -652,24 +712,34 @@ def ReadResource(request, book_id, path):
     if book.format != 'epub':
         raise Http404
 
-    data = getFileData(book)
-    if data is None:
-        raise Http404
+    # normpath collapses any ".." before the lookup, and membership in the
+    # archive is the authorisation: a name that is not in it is a 404.
+    wanted = posixpath.normpath(path).lstrip('/')
 
-    try:
-        with zipfile.ZipFile(data) as archive:
-            # normpath collapses any ".." before the lookup, and membership in
-            # the archive is the authorisation: a name that is not in it is a 404.
-            wanted = posixpath.normpath(path).lstrip('/')
-            info = next((i for i in archive.infolist() if i.filename == wanted), None)
-            if info is None or info.file_size > MAX_RESOURCE_BYTES:
-                raise Http404
-            content_type = mimetypes.guess_type(wanted)[0] or ''
-            if not content_type.startswith('image/'):
-                raise Http404
-            payload = archive.read(info)
-    except zipfile.BadZipFile:
-        raise Http404
+    validator = resource_etag(request, book_id, wanted)
+    cache_key = 'sopds-epubres:%s' % validator.strip('"') if validator else None
+
+    cached = cache.get(cache_key) if cache_key else None
+    if cached is not None:
+        payload, content_type = cached
+    else:
+        content_type = mimetypes.guess_type(wanted)[0] or ''
+        if not content_type.startswith('image/'):
+            raise Http404
+        try:
+            with open_book_archive(book) as archive:
+                info = next((i for i in archive.infolist() if i.filename == wanted), None)
+                if info is None or info.file_size > MAX_RESOURCE_BYTES:
+                    raise Http404
+                payload = archive.read(info)
+        except (zipfile.BadZipFile, OSError):
+            raise Http404
+
+        # A page of illustrations is a burst of requests for the same archive,
+        # so caching the small ones turns the burst into one read. Large plates
+        # are served straight through rather than filling the cache with them.
+        if cache_key and len(payload) <= MAX_CACHED_RESOURCE_BYTES:
+            cache.set(cache_key, (payload, content_type), config.SOPDS_CACHE_TIME)
 
     response = HttpResponse(payload, content_type=content_type)
     patch_cache_control(response, private=True, max_age=config.SOPDS_CACHE_TIME)

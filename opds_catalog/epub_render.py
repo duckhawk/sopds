@@ -302,44 +302,53 @@ def number_paragraphs(body, index):
 
 
 def render(fileobj, resource_url):
-    """The whole book as one XHTML fragment.
+    """The whole book as one XHTML fragment, from a file-like object."""
+    with zipfile.ZipFile(fileobj) as archive:
+        return render_archive(archive, resource_url)
+
+
+def render_archive(archive, resource_url):
+    """The whole book as one XHTML fragment, from an open archive.
+
+    Taking the archive rather than a path lets a caller that already has one
+    open reuse it — the reader serves the text and every illustration out of the
+    same file, and reopening it per request is what made that expensive.
 
     `resource_url(archive_path) -> url` builds the URL for an image; it may
     return None to drop one.
     """
-    with zipfile.ZipFile(fileobj) as archive:
-        documents = spine_documents(archive)
-        names = set(archive.namelist())
-        parts = []
+    documents = spine_documents(archive)
+    names = set(archive.namelist())
+    parts = []
 
-        for index, path in enumerate(documents, start=1):
-            if path not in names:
-                logger.debug('EPUB spine references a missing document: %s', path)
-                continue
-            try:
-                document = _parse_xml(archive.read(path))
-            except (ET.XMLSyntaxError, ET.ParserError, ValueError) as err:
-                logger.debug('EPUB document %s did not parse: %s', path, err)
-                continue
+    for index, path in enumerate(documents, start=1):
+        if path not in names:
+            logger.debug('EPUB spine references a missing document: %s', path)
+            continue
+        try:
+            document = _parse_xml(archive.read(path))
+        except (ET.XMLSyntaxError, ET.ParserError, ValueError) as err:
+            logger.debug('EPUB document %s did not parse: %s', path, err)
+            continue
 
-            # Namespaces come off the whole document, not just the body: a
-            # declaration is only dropped once nothing under its owner uses it,
-            # and the xhtml default namespace is declared on <html>.
-            strip_namespaces(document)
-            body = next((e for e in document.iter()
-                         if _localname(e.tag) == 'body'), document)
+        # Namespaces come off the whole document, not just the body: a
+        # declaration is only dropped once nothing under its owner uses it,
+        # and the xhtml default namespace is declared on <html>.
+        strip_namespaces(document)
+        body = next((e for e in document.iter()
+                     if _localname(e.tag) == 'body'), document)
 
-            base = posixpath.dirname(path)
-            sanitize(body, lambda src, base=base: _image(src, base, names, resource_url))
-            number_paragraphs(body, index)
+        base = posixpath.dirname(path)
+        sanitize(body, lambda src, base=base: _image(src, base, names, resource_url))
+        number_paragraphs(body, index)
 
-            # The chapter marker the reader splits on, then the document itself
-            # flattened to a div so the fragment stays one flat stream.
-            parts.append('<a name="TOC_%d"></a>' % index)
-            body.tag = 'div'
-            for attribute in list(body.attrib):
-                del body.attrib[attribute]
-            parts.append(ET.tostring(body, encoding='unicode', method='html'))
+        # The chapter marker the reader splits on, then the document itself
+        # flattened to a div so the fragment stays one flat stream.
+        parts.append('<a name="TOC_%d"></a>' % index)
+        body.tag = 'div'
+        for attribute in list(body.attrib):
+            del body.attrib[attribute]
+        parts.append(ET.tostring(body, encoding='unicode', method='html'))
 
     if not parts:
         raise EpubError('nothing renderable in the archive')
