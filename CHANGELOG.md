@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Prometheus metrics at `/metrics`**, off by default
+  (`SOPDS_METRICS_ENABLE`), with an optional bearer token
+  (`SOPDS_METRICS_TOKEN`). Until now the only observability was a liveness and
+  a readiness probe, so a deployment could not answer how big the catalogue
+  is, how much is being taken out of it, or — the failure this catalogue
+  actually has — whether the scan is still running at all.
+  Everything exposed is derived from the database on scrape rather than
+  accumulated in the process: the app runs several uwsgi workers, so an
+  in-process counter would describe only whichever worker answered, and
+  getting that right means `prometheus_client`'s multiprocess mode with its
+  shared directory and per-worker cleanup. Gauges read from the DB are the
+  same number whoever answers. Per-request latency and rate are genuinely
+  per-process and are left to an ingress or sidecar that sees every request.
+  `lectern_last_scan_timestamp_seconds` is absent rather than zero when no
+  scan has ever finished, so an alert on staleness can tell the two apart.
+  The body is cached briefly, because several of the gauges are `COUNT()`s
+  over the whole book table and scrapes are frequent.
 - `sopds_enrich` now also gives a book its **authors**, when it has none and
   Open Library knows them. A book whose file carried no author metadata was
   previously unreachable through the author browser and the author search;

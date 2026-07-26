@@ -14,10 +14,12 @@ class constanceTestCase(TestCase):
         pass
 
     def test_constance_attributes_count(self):
+        # A tripwire against losing a setting by accident: bump it deliberately
+        # when adding one. 47 before SOPDS_METRICS_ENABLE / SOPDS_METRICS_TOKEN.
         out = StringIO()
         call_command('constance', 'list', stdout=out)
         out.seek(0)
-        self.assertEqual(out.getvalue().count('\n'), 47)
+        self.assertEqual(out.getvalue().count('\n'), 49)
         out.close()
 
     def test_constance_set_get_attr(self):
