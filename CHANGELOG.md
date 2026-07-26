@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Download and read statistics, and a "Most popular" listing.** Nothing
+  recorded what the library was actually used for, so the one entry point still
+  missing from the catalogue — what everyone else is reading — could not be
+  built. Downloads (including conversions) and reader opens are now counted per
+  book, shown on the card and in the OPDS entry, and a **Most popular** listing
+  (search type `p`) joins *Recently added* and *Top rated* in the root feed and
+  the navigation. Migration `0023`.
+  These are aggregate counters, not a log of events: a per-request table would
+  grow without bound under e-reader polling and would amount to a reading
+  history for every user, which is a far bigger thing to store than "how
+  popular is this book". Nothing records *who* took what — a user's own history
+  already lives in `bookshelf`, where they can see and clear it. Counting is
+  atomic, and it can never fail a download: a counter is worth less than the
+  file the reader came for. Russian translations included, with plural forms.
 - **EPUB can be read in the browser.** Until now the reader was FB2-only; #66
   had removed the Read link everywhere else rather than leave it leading to a
   500. Instead of bolting a second, client-side reader onto the page, the EPUB

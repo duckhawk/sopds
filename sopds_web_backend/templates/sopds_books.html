@@ -87,6 +87,9 @@
 				{% if b.readtime %}
                     <b>{% trans "Read date:" %}</b> <span class="label small">{{ b.readtime.0.readtime }}</span><br>
 				{% endif %}
+				{% if b.stat %}
+				   <b>{% trans "Taken:" %}</b> <span class="label small">{% blocktrans count n=b.stat.downloads %}{{ n }} download{% plural %}{{ n }} downloads{% endblocktrans %}</span><br>
+				{% endif %}
 				{% if b.percent %}
 				   {# Reported by an e-reader over kosync; stored as a 0..1 fraction,
 				      and widthratio is the only stock way to scale it to percent. #}
