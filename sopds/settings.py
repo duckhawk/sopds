@@ -224,7 +224,8 @@ USE_TZ = True
 if os.getenv('REDIS_URL'):
     CACHES = {
         'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            # Degrades to a miss instead of 500ing the request; see sopds/cache.py.
+            'BACKEND': 'sopds.cache.ResilientRedisCache',
             'LOCATION': os.getenv('REDIS_URL'),
         }
     }

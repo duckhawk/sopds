@@ -153,6 +153,11 @@ def gather():
     return body
 
 
+def cache_up():
+    from sopds import cache as cache_backend
+    return cache_backend.is_up()
+
+
 def database_up():
     try:
         connections['default'].cursor().execute('SELECT 1')

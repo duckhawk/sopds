@@ -5,6 +5,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **An unreachable Redis no longer returns 500 for every page.** Django's
+  `RedisCache` lets connection errors out, and the catalogue reads the cache in
+  a dozen places — cover bytes, rendered EPUBs, the alphabet menu, the stats
+  block on every page, the metrics body, the OIDC discovery document, both
+  throttles — so an outage in something whose only job is to make requests
+  faster took the site down with it. Found while testing the rate limit: the
+  throttle handled a dead cache and the cover view behind it did not.
+  A `ResilientRedisCache` backend now degrades every operation to what it would
+  do against an empty cache — reads miss, writes vanish — which callers already
+  handle. Two consequences, deliberate and worth knowing: while the cache is
+  down neither the login lockout nor the content rate limit is enforced, and
+  covers and EPUBs are re-rendered per request. `lectern_cache_up` reports the
+  state so the degradation is visible rather than merely survivable.
+
 ### Added
 - **A correlation id on every request.** Several uwsgi workers interleave their
   output and an e-reader polling feeds produces a great deal of it, so a report

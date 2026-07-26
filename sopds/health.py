@@ -38,5 +38,10 @@ def metrics_view(request):
     body += metrics.render([
         ('lectern_database_up', 'Whether the catalogue database answers.', 'gauge',
          1 if up else 0, None),
+        # A degraded cache does not stop the catalogue serving, so nothing else
+        # reports it; without this it is invisible until someone notices the
+        # latency. It is also a window with no brute-force protection on login.
+        ('lectern_cache_up', 'Whether the shared cache answers.', 'gauge',
+         1 if metrics.cache_up() else 0, None),
     ])
     return HttpResponse(body, content_type=metrics.CONTENT_TYPE)
