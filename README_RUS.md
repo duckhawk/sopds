@@ -266,6 +266,24 @@ MySQL по сравнению с sqlite работает гораздо быст
 >     python3 manage.py sopds_util setconf SOPDS_FB2TOEPUB "convert/fb2conv/fb2epub"
 >     python3 manage.py sopds_util setconf SOPDS_FB2TOMOBI "convert/fb2conv/fb2mobi"
 
+4.4 Чтение DjVu в браузере  
+
+PDF открывается во встроенной читалке без каких-либо дополнительных программ.
+DjVu предварительно конвертируется в PDF программой `ddjvu` из состава djvulibre:  
+
+>     apt-get install djvulibre-bin
+
+Настройка по умолчанию уже указывает на неё, больше ничего делать не нужно:  
+
+>     python3 manage.py sopds_util setconf SOPDS_DJVUTOPDF "ddjvu -format=pdf -quality=75 -skip"
+
+Если программа не установлена, каталог просто не предлагает читать DjVu в
+браузере — книги по-прежнему видны в списках, находятся поиском и скачиваются.
+Ключ `-quality` убирать не следует: без него страницы со сканами фотографий
+конвертируются в растр без сжатия, и сотня страниц может дать гигабайт.
+Результаты конвертации кэшируются в `SOPDS_TEMP_DIR`; когда кэш перерастает
+512 МБ, самые старые файлы удаляются.
+
 #### 5. Консольные команды Simple OPDS  
 
 Показать информацию о коллекции книг:  
@@ -365,6 +383,9 @@ MySQL по сравнению с sqlite работает гораздо быст
 **SOPDS_FB2TOEPUB** и **SOPDS_FB2TOMOBI** задают пути к програмам - конвертерам из FB2 в EPUB и MOBI.
 (по умолчанию SOPDS_FB2TOEPUB = "")  
 (по умолчанию SOPDS_FB2TOMOBI = "")  
+
+**SOPDS_DJVUTOPDF** задает команду конвертации DjVu в PDF для чтения в браузере. Если программы нет в PATH, DjVu не предлагается к чтению.  
+(по умолчанию SOPDS_DJVUTOPDF = "ddjvu -format=pdf -quality=75 -skip")  
 
 **SOPDS_TEMP_DIR** задает путь к временному каталогу, который используется для копирования оригинала и результата конвертации.  
 (по умолчанию SOPDS_TEMP_DIR = os.path.join(BASE_DIR,'tmp'))  

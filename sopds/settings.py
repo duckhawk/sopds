@@ -339,6 +339,14 @@ CONSTANCE_CONFIG = OrderedDict([
     
     ('SOPDS_FB2TOEPUB', ('',_('Path to FB2-EPUB converter program'))),
     ('SOPDS_FB2TOMOBI', ('',_('Path to FB2-MOBI converter program'))),
+    # Unlike the two above this has a working default: it is part of djvulibre,
+    # which any host that has DjVu files at all is likely to have installed. The
+    # reader checks whether the program exists and simply does not offer DjVu
+    # when it does not, so the default is safe on a host without it.
+    # -quality picks JPEG over lossless Flate for continuous-tone pages: without
+    # it a 100-page photographic scan converts to a one-gigabyte PDF. -skip
+    # leaves a damaged page blank instead of abandoning the whole book.
+    ('SOPDS_DJVUTOPDF', ('ddjvu -format=pdf -quality=75 -skip', _('Command converting DjVu to PDF for the in-browser reader (empty = DjVu cannot be read)'))),
     ('SOPDS_TEMP_DIR', (os.path.join(BASE_DIR,'tmp'),_('Path to temporary files directory'))),
 
     ('SOPDS_SERVER_LOG', (os.path.join(BASE_DIR,'opds_catalog/log/sopds_server.log'),_('Path to logfile for sopds_server process'))),
@@ -385,7 +393,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     '3. Scanner Options': ('SOPDS_FB2SAX','SOPDS_ZIPSCAN','SOPDS_ZIPCODEPAGE', 'SOPDS_INPX_ENABLE', 'SOPDS_INPX_SKIP_UNCHANGED', 'SOPDS_INPX_TEST_ZIP', 'SOPDS_INPX_TEST_FILES', 'SOPDS_DELETE_LOGICAL'),
     '4. Scanner Shedule': ('SOPDS_SCAN_SHED_MIN', 'SOPDS_SCAN_SHED_HOUR', 'SOPDS_SCAN_SHED_DAY','SOPDS_SCAN_SHED_DOW'),
     '5. Telegramm Bot Options': ('SOPDS_TELEBOT_API_TOKEN','SOPDS_TELEBOT_AUTH','SOPDS_TELEBOT_MAXITEMS'),
-    '6. Converters Options': ('SOPDS_FB2TOEPUB', 'SOPDS_FB2TOMOBI', 'SOPDS_TEMP_DIR'),
+    '6. Converters Options': ('SOPDS_FB2TOEPUB', 'SOPDS_FB2TOMOBI', 'SOPDS_DJVUTOPDF', 'SOPDS_TEMP_DIR'),
     '7. Log & PID Files': ('SOPDS_SERVER_LOG', 'SOPDS_SCANNER_LOG', 'SOPDS_TELEBOT_LOG','SOPDS_SERVER_PID','SOPDS_SCANNER_PID','SOPDS_TELEBOT_PID'),
     '8. OIDC (Keycloak)': ('SOPDS_OIDC_ENABLE', 'SOPDS_OIDC_ISSUER', 'SOPDS_OIDC_CLIENT_ID', 'SOPDS_OIDC_CLIENT_SECRET', 'SOPDS_OIDC_SCOPES', 'SOPDS_OIDC_BUTTON_TEXT'),
     '9. Reading Progress Sync': ('SOPDS_KOSYNC_ENABLE', 'SOPDS_KOSYNC_ALLOW_REGISTER', 'SOPDS_WEBDAV_ENABLE', 'SOPDS_WEBDAV_ROOT'),

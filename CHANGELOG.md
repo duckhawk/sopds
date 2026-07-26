@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Reading PDF and DjVu in the browser.** These are the two formats the
+  catalogue happily indexed, served and refused to open: the existing reader
+  turns a book into one long numbered sequence of paragraphs, and a scan has no
+  paragraphs, only ink at fixed coordinates. They now get a second reader that
+  draws pages, sharing the shelf, the progress bar and the saved position with
+  the first — the page number goes through the same `setpos`/`getpos` pair.
+  PDF is drawn by [pdf.js](https://github.com/mozilla/pdf.js) (Apache 2.0,
+  vendored under `static/js/vendor/pdfjs/`, no build step). DjVu is converted
+  to PDF by `ddjvu` from djvulibre, invoked at arm's length as a separate
+  program exactly as the FB2 converters already are, and the result is cached
+  on disk under `SOPDS_TEMP_DIR` — keyed on the same content validator as the
+  ETag, so replacing a file invalidates it, and pruned oldest-first past
+  512 MB. A host without djvulibre simply does not offer DjVu as readable,
+  rather than offering a reader that never loads.
+  The content route answers `Range` requests, which Django does not do on its
+  own: pdf.js asks for the trailer, then the cross-reference table, then the
+  pages actually being looked at, and that is the difference between opening a
+  300 MB scan at once and downloading all of it first. Pages are drawn as they
+  scroll into view and discarded once well behind, so a long book does not run
+  a tablet out of memory.
+  New setting `SOPDS_DJVUTOPDF` (default `ddjvu -format=pdf -quality=75
+  -skip`). `-quality` is not cosmetic: without it a photographic scan converts
+  to lossless raster, and a measured 100-page one came to a gigabyte.
 - **`sopds_userdata_export` / `sopds_userdata_import`** — a backup for the part
   of the database a rescan cannot rebuild: shelves, statuses, ratings, reading
   positions, progress synced from e-readers, reader preferences, download and

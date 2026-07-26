@@ -21,7 +21,7 @@ from django.utils.cache import patch_cache_control
 from django.views.decorators.http import etag
 
 from opds_catalog.models import Book, bookshelf
-from opds_catalog import settings, utils, opdsdb, epub_render, stats, throttle
+from opds_catalog import settings, utils, opdsdb, epub_render, paged, stats, throttle
 import zipfile
 from opds_catalog.ziptools import open_zipfile
 
@@ -191,6 +191,10 @@ def read_etag(request, book_id):
 
 def resource_etag(request, book_id, path):
     return content_etag(request, book_id, 'res:%s' % path)
+
+
+def paged_etag(request, book_id):
+    return content_etag(request, book_id, 'pdf')
 
 
 @contextlib.contextmanager
@@ -623,10 +627,20 @@ def ConvertFB2(request, book_id, convert_type):
     return response
 
 
-# Formats the in-browser reader can render. FB2 goes through FB2_22_xhtml.xsl,
+# Formats the flowing reader can render. FB2 goes through FB2_22_xhtml.xsl,
 # EPUB through opds_catalog.epub_render; both produce the same flat stream of
 # numbered paragraphs, so the reader itself does not care which it got.
 READABLE_FORMATS = ('fb2', 'epub')
+
+
+def viewable_formats():
+    """Every format a reader can open in the browser, however it is shown.
+
+    Two readers, because two kinds of book: the flowing one for text, the paged
+    one for scans. Which paged formats count depends on the installation — DjVu
+    needs a converter — so this is a function rather than a constant.
+    """
+    return READABLE_FORMATS + paged.viewable_formats()
 
 
 @require_catalog_access
@@ -637,6 +651,34 @@ def Read(request, book_id):
     if book.format == 'epub':
         return render_epub(request, book)
     return ReadFB2(request, book_id)
+
+
+@require_catalog_access
+@etag(paged_etag)
+def PagedSource(request, book_id):
+    """The book as a PDF, for the paged reader to draw.
+
+    A PDF is sent as it is; a DjVu is converted and the result kept on disk.
+    The response honours `Range`, so the reader fetches the pages it is showing
+    rather than the whole of a scan before the first one appears.
+    """
+    book = get_object_or_404(Book, id=book_id)
+    if book.format not in paged.viewable_formats():
+        raise Http404
+
+    # Only on the opening request. Reading a scan is a long series of Range
+    # requests for the same book, and each one would otherwise cost a query to
+    # rediscover that it is already on the shelf.
+    if (config.SOPDS_AUTH and request.user.is_authenticated
+            and not request.headers.get('Range')):
+        bookshelf.objects.get_or_create(user=request.user, book=book)
+
+    path = paged.materialise(book, paged_etag(request, book_id), container_path(book))
+    if path is None:
+        raise Http404
+
+    (name, _ext) = os.path.splitext(getFileName(book))
+    return paged.serve(request, path, '%s.pdf' % name)
 
 
 def render_epub(request, book):

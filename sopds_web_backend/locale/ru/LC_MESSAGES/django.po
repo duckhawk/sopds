@@ -24,6 +24,30 @@ msgstr ""
 msgid "Chapter"
 msgstr "Глава"
 
+#: templates/PagedReader.html:30
+msgid "Zoom out"
+msgstr "Уменьшить"
+
+#: templates/PagedReader.html:31
+msgid "Fit the width"
+msgstr "По ширине"
+
+#: templates/PagedReader.html:32
+msgid "Zoom in"
+msgstr "Увеличить"
+
+#: templates/PagedReader.html:34
+msgid "Page"
+msgstr "Страница"
+
+#: templates/PagedReader.html:37
+msgid "Opening the book…"
+msgstr "Открываем книгу…"
+
+#: templates/PagedReader.html:56
+msgid "This book could not be opened."
+msgstr "Не удалось открыть эту книгу."
+
 #: templates/admin/base.html:30
 msgid "Welcome,"
 msgstr "Добро пожаловать, "

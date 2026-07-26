@@ -22,7 +22,7 @@ from opds_catalog.models import Book, Author, Series, bookshelf, Collection, Cou
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
-from opds_catalog import collections, delivery, dl, ratings, stats, tags, throttle
+from opds_catalog import collections, delivery, dl, paged, ratings, stats, tags, throttle
 from constance import config
 from sopds_web_backend import oidc
 from sopds import email as mail
@@ -400,9 +400,10 @@ def SearchBooksView(request):
         page_stats = stats.summary(r.id for r in page_rows)
         page_tags = tags.for_books(r.id for r in page_rows)
         page_collections = collections.containing(request.user, (r.id for r in page_rows))
-        # One check for the page, not one per book: it depends on the reader
+        # One check for the page, not one per book: these depend on the reader
         # and the server, never on the book.
         can_send = delivery.can_send(request.user)
+        viewable = dl.viewable_formats()
 
         for row in page_rows:
             user_shelf = getattr(row, 'user_shelf', []) if config.SOPDS_AUTH else []
@@ -430,7 +431,7 @@ def SearchBooksView(request):
                  # The user's own star count, and what everyone else made of it.
                  'rating_all': page_ratings.get(row.id),
                  'stat': page_stats.get(row.id),
-                 'readable': row.format in dl.READABLE_FORMATS,
+                 'readable': row.format in viewable,
                  'sendable': can_send,
                  'tags': page_tags.get(row.id, []),
                  'tags_editable': config.SOPDS_TAGS_EDITABLE,
@@ -1346,11 +1347,11 @@ def LogoutView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BookReaderView(request, book_id):
-    # The page is only a shell: it fetches opds:read, which renders FB2 and EPUB
-    # and nothing else. Refuse here as well, so an unreadable format fails as a
-    # 404 on the link instead of loading a reader that stays permanently empty.
+    # The page is only a shell around a content route. Refuse an unshowable
+    # format here as well, so it fails as a 404 on the link instead of loading a
+    # reader that stays permanently empty.
     book = get_object_or_404(Book, id=book_id)
-    if book.format not in dl.READABLE_FORMATS:
+    if book.format not in dl.viewable_formats():
         raise Http404
 
     # Counted here rather than on the content route: that one answers a
@@ -1365,6 +1366,11 @@ def BookReaderView(request, book_id):
     args['reader_mode'] = prefs.reader_mode
     args['font_size'] = prefs.font_size
     args['css_file'] = prefs.theme_css
+
+    # Two readers, because two kinds of book: text that reflows, and pages that
+    # do not. The font size and the chapter mode mean nothing to a scan.
+    if paged.is_paged(book.format):
+        return render(request, 'PagedReader.html', args)
     return render(request, 'BookReader.html', args)
 
 
