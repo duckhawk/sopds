@@ -176,3 +176,33 @@ def test_clearing_a_rating_removes_the_vote(signed_in, library):
     book = library['books']['Great book']         # 5, 5, 4 from three users
     assert signed_in.post(reverse('web:bsrating', args=[book.id]), {'rating': '0'}).status_code == 200
     assert ratings.summary([book.id])[book.id] == {'average': 4.5, 'votes': 2}
+
+
+# --- cost ------------------------------------------------------------------
+
+@pytest.mark.django_db
+def test_the_listing_does_not_touch_unrated_books(library, django_user_model):
+    """The property the query is shaped around.
+
+    Aggregating straight over Book made the join and GROUP BY cover the whole
+    catalogue and then throw almost all of it away, so the cost grew with the
+    number of books rather than the number of ratings — 4 ms at 2k books and
+    66 ms at 60k, for a result that never changed. Restricting the outer query
+    to books someone has rated is what fixes that, and this asserts the shape
+    rather than a timing, which would be flaky.
+    """
+    cat = Catalog.objects.get()
+    Book.objects.bulk_create([
+        Book(filename='bulk%d.fb2' % n, path='.', filesize=1, format='fb2',
+             cat_type=0, docdate='2011', lang='en', title='Bulk %d' % n,
+             search_title='BULK %d' % n, annotation='', avail=2, catalog=cat)
+        for n in range(500)])
+
+    sql = str(ratings.top_rated().query)
+    # The rated set is selected as a subquery the outer query filters on, rather
+    # than every book being aggregated and then filtered by HAVING.
+    assert 'IN (SELECT' in sql.upper()
+    assert 'HAVING' not in sql.upper()
+
+    # And the answer is still only the rated books.
+    assert len(list(ratings.top_rated())) == 3
