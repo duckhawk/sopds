@@ -21,6 +21,26 @@ All notable changes to this project are documented here. The format is based on
   go up; and anything that cannot be matched is counted and reported rather
   than guessed at.
 
+### Added
+- **Self-service accounts.** A password could only be changed, and an account
+  only created, through the Django admin — fine for one administrator and
+  constant friction for everyone else, since a reader who forgot their password
+  had to find a human. There is now a change-password form linked from the
+  settings page, a forgotten-password flow linked from the login page, and an
+  optional registration form (`SOPDS_ALLOW_REGISTRATION`, off by default,
+  because a form left open on the internet is a way to acquire strangers).
+  The reset and confirm steps are Django's own views wearing this project's
+  chrome: token generation and expiry are where the security lives and are not
+  worth reimplementing. The reset form reports the same thing for a known and
+  an unknown address, so it cannot be used to find out who has an account, and
+  it is hidden entirely when mail is not configured rather than offering
+  something that cannot work. Registration and reset share a per-client
+  throttle — both make work for someone else.
+- **Mail is configured in the admin**, like everything else an operator has to
+  set here: host, port, credentials, STARTTLS/SSL and the From address, through
+  a backend that reads them at connection time. A password reset that does not
+  arrive is then diagnosed and fixed without a redeploy.
+
 ### Changed
 - The **Top rated** listing no longer costs more as the library grows. It
   aggregated over every book and then discarded almost all of them with a

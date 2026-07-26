@@ -16,6 +16,12 @@
 </div>
 </div>
 </form>
+<div class="row">
+<div class="small-6 medium-4 large-3 small-centered columns" style="font-size:85%;">
+  {% if mail_configured %}<a href="{% url "web:password_reset" %}">{% trans "Forgot your password?" %}</a>{% endif %}
+  {% if allow_registration %}<br><a href="{% url "web:register" %}">{% trans "Create an account" %}</a>{% endif %}
+</div>
+</div>
 {% if oidc_enabled %}
 <div class="row">
 <div class="small-6 medium-4 large-3 small-centered columns text-center">
