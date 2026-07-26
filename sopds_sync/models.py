@@ -4,6 +4,8 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
 
+from opds_catalog.models import Book
+
 
 class KosyncCredential(models.Model):
     """Per-user credential for the KOReader "kosync" progress-sync protocol.
@@ -34,17 +36,55 @@ class KosyncCredential(models.Model):
         return 'kosync:%s' % self.user.username
 
 
+class BookDigest(models.Model):
+    """A KOReader document hash that identifies a catalogue Book.
+
+    kosync names a book only by a hash the client computes from the copy on the
+    device, so the protocol on its own cannot tell the server *which* book is
+    being read. Precomputing the hashes our own files would produce closes that
+    gap: :mod:`sopds_sync.digest` builds them and `sopds_kosync_index` stores
+    them here.
+
+    One book yields several: KOReader can hash either the file name or the
+    contents, and the name on the device depends on how the book was fetched
+    (``SOPDS_TITLE_AS_FILENAME`` picks between the transliterated title and the
+    original name, and a zip download is extracted before it is read). Hence a
+    table rather than a column, unique on the digest so a lookup is one index
+    hit — and so two books that really do hash alike (the same file twice under
+    different names) cannot both claim the hash.
+    """
+    FILENAME = 'filename'
+    BINARY = 'binary'
+    METHOD_CHOICES = [(FILENAME, 'File name md5'), (BINARY, 'Partial content md5')]
+
+    book = models.ForeignKey(Book, db_index=True, on_delete=models.CASCADE,
+                             related_name='digests')
+    digest = models.CharField(max_length=32, unique=True)
+    method = models.CharField(max_length=16, choices=METHOD_CHOICES)
+
+    def __str__(self):
+        return '%s:%s' % (self.method, self.digest)
+
+
 class KosyncProgress(models.Model):
     """One document's reading progress for a user — the kosync key-value store.
 
     ``document`` is the opaque 32-char hash KOReader computes on the client
-    (either a filename-based or a partial-binary md5). The server never needs to
-    map it to a catalog Book: it just stores the latest progress reported for a
-    ``(user, document)`` pair and returns it on GET. Last write wins, matching
-    the reference kosync server — conflict resolution is the client's job.
+    (either a filename-based or a partial-binary md5). Storage and retrieval do
+    not depend on knowing which book that is: the latest progress reported for a
+    ``(user, document)`` pair is kept and returned on GET, last write wins,
+    matching the reference kosync server — conflict resolution is the client's
+    job.
+
+    ``book`` is resolved through :class:`BookDigest` when we recognise the hash.
+    It is nullable and purely additive: it is what lets the web UI show that a
+    book is being read on an e-reader, and it must never be able to make the
+    sync protocol itself fail.
     """
     user = models.ForeignKey(User, db_index=True, on_delete=models.CASCADE)
     document = models.CharField(max_length=32, db_index=True)
+    book = models.ForeignKey(Book, null=True, default=None, db_index=True,
+                             on_delete=models.SET_NULL)
     progress = models.CharField(max_length=1024)  # xpointer / page position, opaque to us
     percentage = models.FloatField(default=0.0)
     device = models.CharField(max_length=256, blank=True, default='')

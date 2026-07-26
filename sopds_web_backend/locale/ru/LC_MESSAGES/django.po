@@ -469,6 +469,10 @@ msgstr "Поиск по ISBN"
 msgid "Publisher:"
 msgstr "Издательство:"
 
+#: templates/sopds_books.html:81
+msgid "Progress:"
+msgstr "Прогресс:"
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"

@@ -13,6 +13,7 @@ All routes are CSRF-exempt (native clients can't carry a CSRF token) and return
 disabled.
 """
 import json
+import logging
 import re
 
 from django.contrib.auth.models import User
@@ -22,8 +23,11 @@ from django.views.decorators.csrf import csrf_exempt
 
 from constance import config
 
+from . import linking
 from .auth import authenticate_kosync
 from .models import KosyncCredential, KosyncProgress
+
+logger = logging.getLogger(__name__)
 
 _MD5_RE = re.compile(r'^[0-9a-fA-F]{1,32}$')
 
@@ -114,9 +118,11 @@ def progress_update(request):
         percentage = 0.0
 
     now = timezone.now()
+    book = linking.resolve_book(document)
     KosyncProgress.objects.update_or_create(
         user=user, document=document,
         defaults={
+            'book': book,
             'progress': str(data.get('progress') or '')[:1024],
             'percentage': percentage,
             'device': str(data.get('device') or '')[:256],
@@ -124,6 +130,15 @@ def progress_update(request):
             'timestamp': now,
         },
     )
+
+    # Reflecting progress onto the shelf is a convenience on top of the sync,
+    # never a precondition for it: a reader that gets an error here would retry
+    # forever and lose the position it was trying to save.
+    try:
+        linking.record_progress(user, book, percentage, when=now)
+    except Exception:
+        logger.exception('Could not record shelf progress for document %s', document)
+
     return JsonResponse({'document': document, 'timestamp': _epoch(now)}, status=200)
 
 

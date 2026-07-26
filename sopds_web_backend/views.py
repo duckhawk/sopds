@@ -361,7 +361,9 @@ def SearchBooksView(request):
                  'bookshelf': bool(user_shelf),
                  'readtime': user_shelf if config.SOPDS_AUTH else None,
                  'status': user_shelf[0].status if user_shelf else '',
-                 'rating': user_shelf[0].rating if user_shelf else None
+                 'rating': user_shelf[0].rating if user_shelf else None,
+                 # Percentage read, as reported by an e-reader over kosync.
+                 'percent': user_shelf[0].percent if user_shelf else None
                  }
 
             if summary_DOUBLES_HIDE:
@@ -656,7 +658,8 @@ def CatalogsView(request):
               'authors':row.authors.all(), 'genres':row.genres.all(), 'series':row.series.all(), 'ser_no':row.bseries_set.all(),\
               'readtime': user_shelf if config.SOPDS_AUTH else None,
               'status': user_shelf[0].status if user_shelf else '',
-              'rating': user_shelf[0].rating if user_shelf else None
+              'rating': user_shelf[0].rating if user_shelf else None,
+              'percent': user_shelf[0].percent if user_shelf else None
              }
         items.append(p)
                     

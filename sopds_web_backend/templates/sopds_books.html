@@ -87,6 +87,11 @@
 				{% if b.readtime %}
                     <b>{% trans "Read date:" %}</b> <span class="label small">{{ b.readtime.0.readtime }}</span><br>
 				{% endif %}
+				{% if b.percent %}
+				   {# Reported by an e-reader over kosync; stored as a 0..1 fraction,
+				      and widthratio is the only stock way to scale it to percent. #}
+				   <b>{% trans "Progress:" %}</b> <span class="label small">{% widthratio b.percent 1 100 %}%</span><br>
+				{% endif %}
 				{% if sopds_auth %}
 				<div class="bs-controls" style="margin-top:.3rem;">
 					<b>{% trans "Status:" %}</b>

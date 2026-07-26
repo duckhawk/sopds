@@ -155,6 +155,10 @@ class bookshelf(models.Model):
     STATUS_CHOICES = [('', '—'), (STATUS_TO_READ, 'To read'), (STATUS_READING, 'Reading'), (STATUS_READ, 'Read')]
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default='', blank=True)
     rating = models.PositiveSmallIntegerField(null=True, default=None)  # 1..5
+    # How far through the book the reader is, 0.0..1.0. Unlike `position`, which
+    # is a paragraph id only the in-browser reader understands, this is a format
+    # the e-reader protocols also speak, so kosync progress can land here.
+    percent = models.FloatField(null=True, default=None)
 
     class Meta:
         unique_together = ['user', 'book']
