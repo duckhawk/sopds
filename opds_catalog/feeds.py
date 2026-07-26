@@ -17,6 +17,7 @@ from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 
 from book_tools.format import mime_detector
 from book_tools.format.mimetype import Mimetype
+from book_tools.format.util import normalize_isbn
 
 from constance import config
 
@@ -245,7 +246,7 @@ class CatalogsFeed(AuthFeed):
         for row in page_books[op.d2_first_pos:op.d2_last_pos+1]:
             p = {'is_catalog':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
                   'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
-                  'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize//1000,
+                  'docdate': row.docdate, 'format': row.format, 'title': row.title, 'isbn': row.isbn, 'filesize': row.filesize//1000,
                   'authors':[{'id': a.id, 'full_name': a.full_name} for a in row.authors.all()],
                   'genres':[{'id': g.id, 'subsection': g.subsection} for g in row.genres.all()],
                   'series':[{'id': s.id, 'ser': s.ser} for s in row.series.all()],
@@ -363,11 +364,16 @@ class SearchTypesFeed(AuthFeed):
         }
 
     def items(self, obj):
-        return [
+        items = [
                     {"id":1, "title":_("Search by titles"), "term":obj, "descr": _("Search books by title")},
                     {"id":2, "title":_("Search by authors"), "term":obj, "descr": _("Search authors by name")},
                     {"id":3, "title":_("Search series"), "term":obj, "descr": _("Search series")},
         ]
+        # Only offered when the term actually is one — an ISBN search on a title
+        # would always come back empty, which is worse than not offering it.
+        if normalize_isbn(obj):
+            items.append({"id":4, "title":_("Search by ISBN"), "term":obj, "descr": _("Search books by ISBN")})
+        return items
 
     def item_link(self, item):
         if item["id"] == 1:
@@ -376,6 +382,8 @@ class SearchTypesFeed(AuthFeed):
             return reverse("opds_catalog:searchauthors", kwargs={"searchtype":"m", "searchterms":item["term"]})
         elif item["id"] == 3:
             return reverse("opds_catalog:searchseries", kwargs={"searchtype":"m", "searchterms":item["term"]})
+        elif item["id"] == 4:
+            return reverse("opds_catalog:searchbooks", kwargs={"searchtype":"x", "searchterms":item["term"]})
         return None
              
     def item_title(self, item):
@@ -415,6 +423,14 @@ class SearchBooksFeed(AuthFeed):
         elif searchtype == 'b':
             #books = Book.objects.extra(where=["upper(title) like %s"], params=["%s%%"%searchterms.upper()]).order_by('title','-docdate')
             books = Book.objects.filter(search_title__startswith=searchterms.upper()).order_by('search_title','-docdate')
+        # Поиск книг по ISBN
+        elif searchtype == 'x':
+            isbn = normalize_isbn(searchterms)
+            # An unparseable ISBN matches nothing rather than everything: the
+            # stored value is always the normalised (hyphen-free, checksum-valid)
+            # form, so there is no sensible fallback to a substring match.
+            books = Book.objects.filter(isbn=isbn) if isbn else Book.objects.none()
+            books = books.order_by('search_title', '-docdate')
         # Поиск книг по точному совпадению наименования
         elif searchtype == 'e':
             #books = Book.objects.extra(where=["upper(title)=%s"], params=["%s"%searchterms.upper()]).order_by('title','-docdate')
@@ -501,7 +517,7 @@ class SearchBooksFeed(AuthFeed):
         for row in page_rows:
             p = {'doubles':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
                   'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
-                  'docdate': row.docdate, 'format': row.format, 'title': row.title, 'filesize': row.filesize//1000,
+                  'docdate': row.docdate, 'format': row.format, 'title': row.title, 'isbn': row.isbn, 'filesize': row.filesize//1000,
                   'authors':[{'id': a.id, 'full_name': a.full_name} for a in row.authors.all()],
                   'genres':[{'id': g.id, 'subsection': g.subsection} for g in row.genres.all()],
                   'series':[{'id': s.id, 'ser': s.ser} for s in row.series.all()],
@@ -615,11 +631,12 @@ class SearchBooksFeed(AuthFeed):
         if item['genres']: s += _("<b>Genres: </b>%(genres)s<br/>")
         if item['series']: s += _("<b>Series: </b>%(series)s<br/>")
         if item['ser_no']: s += _("<b>No in Series: </b>%(ser_no)s<br/>")
+        if item['isbn']: s += _("<b>ISBN: </b>%(isbn)s<br/>")
         s += _("<b>File: </b>%(filename)s<br/><b>File size: </b>%(filesize)s<br/><b>Changes date: </b>%(docdate)s<br/>")
         if item['doubles']: s += _("<b>Doubles count: </b>%(doubles)s<br/>")
         s +="<p class='book'>%(annotation)s</p>"
         return s%{'title':item['title'],'filename':item['filename'], 'filesize':item['filesize'],'docdate':item['docdate'],
-                  'doubles':item['doubles'],'annotation':item['annotation'],
+                  'doubles':item['doubles'],'annotation':item['annotation'],'isbn':item['isbn'],
                   'authors':", ".join(a['full_name'] for a in item['authors']),
                   'genres':", ".join(g['subsection'] for g in item['genres']),
                   'series':", ".join(s['ser'] for s in item['series']),

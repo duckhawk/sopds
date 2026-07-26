@@ -30,8 +30,8 @@ urlpatterns = [
     re_path(r'^search/$',feeds.OpenSearch, name='opensearch'),
     #re_path(r'search/{searchTerms}/$',feeds.OpenSearch, name='search_template'),
 
-    re_path(r'^search/books/(?P<searchtype>[bmasguedn])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
-    re_path(r'^search/books/(?P<searchtype>[bmasguedn])/(?P<searchterms>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
+    re_path(r'^search/books/(?P<searchtype>[bmasguednx])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
+    re_path(r'^search/books/(?P<searchtype>[bmasguednx])/(?P<searchterms>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/(?P<searchterms0>.+)/(?P<page>\d+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/(?P<searchterms0>.+)/$',feeds.SearchBooksFeed(), name='searchbooks'),
     re_path(r'^search/books/(?P<searchtype>as)/(?P<searchterms>.+)/$',feeds.SelectSeriesFeed(), name='searchbooks'),

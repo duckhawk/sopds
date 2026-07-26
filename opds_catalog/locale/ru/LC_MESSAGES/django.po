@@ -123,6 +123,19 @@ msgstr ""
 "<b>Файл: </b>%(filename)s<br/><b>Размер файла: </b>%(filesize)s<br/><b>Дата "
 "изменения: </b>%(docdate)s<br/>"
 
+#: .\opds_catalog\feeds.py:372
+msgid "Search by ISBN"
+msgstr "Поиск по ISBN"
+
+#: .\opds_catalog\feeds.py:372
+msgid "Search books by ISBN"
+msgstr "Поиск книг по ISBN"
+
+#: .\opds_catalog\feeds.py:628
+#, python-format
+msgid "<b>ISBN: </b>%(isbn)s<br/>"
+msgstr "<b>ISBN: </b>%(isbn)s<br/>"
+
 #: .\opds_catalog\feeds.py:357 .\opds_catalog\tests\test_feeds.py:60
 msgid "Search by titles"
 msgstr "Поиск по наименованиям"
