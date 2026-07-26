@@ -374,6 +374,7 @@ class SearchTypesFeed(AuthFeed):
                     {"id":1, "title":_("Search by titles"), "term":obj, "descr": _("Search books by title")},
                     {"id":2, "title":_("Search by authors"), "term":obj, "descr": _("Search authors by name")},
                     {"id":3, "title":_("Search series"), "term":obj, "descr": _("Search series")},
+                    {"id":5, "title":_("Search by genre"), "term":obj, "descr": _("Search genres by name")},
         ]
         # Only offered when the term actually is one — an ISBN search on a title
         # would always come back empty, which is worse than not offering it.
@@ -390,6 +391,8 @@ class SearchTypesFeed(AuthFeed):
             return reverse("opds_catalog:searchseries", kwargs={"searchtype":"m", "searchterms":item["term"]})
         elif item["id"] == 4:
             return reverse("opds_catalog:searchbooks", kwargs={"searchtype":"x", "searchterms":item["term"]})
+        elif item["id"] == 5:
+            return reverse("opds_catalog:searchgenres", kwargs={"searchtype":"m", "searchterms":item["term"]})
         return None
              
     def item_title(self, item):
@@ -890,6 +893,83 @@ class SearchSeriesFeed(AuthFeed):
     def item_enclosures(self, item):
         return (opdsEnclosure(self.item_link(item),"application/atom+xml;profile=opds-catalog;kind=navigation", "subsection"),)
     
+class SearchGenresFeed(AuthFeed):
+    """Find genres by name, then list the books in one.
+
+    Genres were browsable — the root feed has a genre tree — but not
+    searchable: to reach "Detective" you had to know which section it sat
+    under. This mirrors SearchAuthorsFeed/SearchSeriesFeed rather than adding
+    another single-letter book-search type, because the result is a list of
+    genres to pick from, not a list of books.
+
+    Matching is on `subsection`, the leaf name a reader would actually type;
+    `section` is the broad grouping above it and is shown for context.
+    """
+    feed_type = opdsFeed
+    subtitle = settings.SUBTITLE
+
+    def title(self, obj):
+        return "%s | %s"%(settings.TITLE,_("Genres found"))
+
+    def get_object(self, request, searchterms, searchtype, page=1):
+        if not isinstance(page, int):
+            page = int(page)
+        page_num = page if page>0 else 1
+
+        term = searchterms.strip()
+        if searchtype == 'b':
+            genres = Genre.objects.filter(subsection__istartswith=term)
+        elif searchtype == 'e':
+            genres = Genre.objects.filter(subsection__iexact=term)
+        else:
+            genres = Genre.objects.filter(subsection__icontains=term)
+
+        genres = genres.annotate(count_book=Count('book')).order_by('section', 'subsection')
+
+        op = OPDS_Paginator(genres.count(), 0, page_num, config.SOPDS_MAXITEMS)
+        items = [{'id': row.id, 'section': row.section, 'subsection': row.subsection,
+                  'book_count': row.count_book}
+                 for row in genres[op.d1_first_pos:op.d1_last_pos+1]]
+
+        return {"genres": items, "searchterms": searchterms,
+                "searchtype": searchtype, "paginator": op.get_data_dict()}
+
+    def link(self, obj):
+        return reverse("opds_catalog:searchgenres",
+                       kwargs={"searchtype":obj["searchtype"], "searchterms":obj["searchterms"]})
+
+    def feed_extra_kwargs(self, obj):
+        def page_url(number):
+            return reverse("opds_catalog:searchgenres",
+                           kwargs={"searchtype":obj["searchtype"],
+                                   "searchterms":obj["searchterms"], "page":number})
+        return {
+                "searchTerm_url":"%s%s"%(reverse("opds_catalog:opensearch"),'{searchTerms}/'),
+                "start_url":reverse("opds_catalog:main"),
+                "description_mime_type":"text",
+                "prev_url":page_url(obj["paginator"]['previous_page_number']) if obj["paginator"]['has_previous'] else None,
+                "next_url":page_url(obj["paginator"]['next_page_number']) if obj["paginator"]['has_next'] else None,
+        }
+
+    def items(self, obj):
+        return obj["genres"]
+
+    def item_title(self, item):
+        return "%s / %s"%(item['section'], item['subsection'])
+
+    def item_description(self, item):
+        return _("Books count: %s")%item['book_count']
+
+    def item_guid(self, item):
+        return "g:%s"%item['id']
+
+    def item_link(self, item):
+        return reverse("opds_catalog:searchbooks",
+                       kwargs={"searchtype":"g", "searchterms":item['id']})
+
+    def item_enclosures(self, item):
+        return (opdsEnclosure(self.item_link(item),"application/atom+xml;profile=opds-catalog;kind=navigation", "subsection"),)
+
 class LangFeed(AuthFeed):
     feed_type = opdsFeed
     subtitle = settings.SUBTITLE

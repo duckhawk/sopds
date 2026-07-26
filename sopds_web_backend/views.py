@@ -641,6 +641,59 @@ def SearchAuthorsView(request):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+def SearchGenresView(request):
+    """Find genres by name.
+
+    Genres were browsable through the section tree but not searchable, so
+    reaching a leaf like "Detective" meant knowing which section it sits under.
+    Matching is on `subsection` — the leaf name a reader would type — with
+    `section` shown alongside for context.
+    """
+    args = {}
+    args.update(csrf(request))
+
+    if request.GET:
+        searchtype = request.GET.get('searchtype', 'm')
+        searchterms = (request.GET.get('searchterms') or '').strip()
+        page_num = _int_param(request, 'page', 1)
+        page_num = page_num if page_num > 0 else 1
+
+        if searchtype == 'b':
+            genres = Genre.objects.filter(subsection__istartswith=searchterms)
+        elif searchtype == 'e':
+            genres = Genre.objects.filter(subsection__iexact=searchterms)
+        else:
+            genres = Genre.objects.filter(subsection__icontains=searchterms)
+
+        genres = (genres.annotate(num_book=Count('book'))
+                  .filter(num_book__gt=0).order_by('section', 'subsection'))
+
+        op = OPDS_Paginator(genres.count(), 0, page_num,
+                            config.SOPDS_MAXITEMS, HALF_PAGES_LINKS)
+        args['items'] = [
+            {'id': row.id, 'section': row.section, 'subsection': row.subsection,
+             'num_book': row.num_book}
+            for row in genres[op.d1_first_pos:op.d1_last_pos + 1]]
+
+        args['paginator'] = op.get_data_dict()
+        args['searchterms'] = searchterms
+        args['searchtype'] = searchtype
+        args['searchobject'] = 'genre'
+        args['current'] = 'search'
+        args['is_search'] = True
+        # Truthy so the shared template links straight to the books in a genre
+        # rather than drilling into a section.
+        args['parent_id'] = -1
+        args['breadcrumbs'] = [_('Genres'), _('Search'), searchterms]
+        args['cache_id'] = 'g:%s:%s:%s' % (searchterms, searchtype, op.page_num)
+        args['cache_t'] = config.SOPDS_CACHE_TIME
+        args['css_file'] = theme_css(request.user)
+
+    return render(request, 'sopds_selectgenres.html', args)
+
+
+@vary_on_headers("HTTP_ACCEPT_LANGUAGE")
+@sopds_login(url='web:login')
 def CatalogsView(request):   
     args = {}
 

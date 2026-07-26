@@ -511,6 +511,10 @@ msgstr "Показать:"
 msgid "All"
 msgstr "Все"
 
+#: templates/sopds_nav.html:62
+msgid "Genre"
+msgstr "Жанр"
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"

@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Genres can be searched by name**, in OPDS (`/opds/search/genres/m/<term>/`,
+  and an entry in the OPDS search menu) and in the web UI (a *Genre* option in
+  the search-type chooser). They were browsable through the section tree but
+  not searchable, so reaching a leaf like "Detective" meant already knowing
+  which section it sits under. Matching is on the leaf name a reader would
+  actually type, with the section shown alongside for context; results link
+  straight to the books in that genre. Modelled on the existing author and
+  series searches rather than as another single-letter book-search type,
+  because the result is a list of genres to choose from, not a list of books.
 - The bookshelf can be narrowed by reading status
   (`/web/search/books/?searchtype=u&status=reading`). Status has been set by
   hand, and by an e-reader syncing progress since the kosync link, but the
