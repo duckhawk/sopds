@@ -349,7 +349,8 @@ def OpenSearch(request):
     """
     Выводим шаблон поиска
     """
-    return render(request, 'opensearch.html')
+    return render(request, 'opensearch.html',
+                  {'title': settings.TITLE, 'icon': settings.ICON})
 
 class SearchTypesFeed(AuthFeed):
     feed_type = opdsFeed

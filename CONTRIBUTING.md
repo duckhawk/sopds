@@ -47,5 +47,5 @@ Keep it clean.
 ## Deployment
 
 Production is deployed from the separate `sopds-k8s` repository (werf + GitLab
-CI). That repo pins a specific `duckhawk/sopds` commit; after merging to
+CI). That repo pins a specific `duckhawk/lectern` commit; after merging to
 `master`, bump the pin there.

@@ -14,7 +14,7 @@ API_URL = 'https://openlibrary.org/api/books'
 
 # Open Library asks callers to identify themselves so they can contact the
 # operator of a misbehaving client instead of blocking it outright.
-USER_AGENT = 'Lectern-OPDS/1.0 (+https://github.com/mitshel/sopds) metadata enrichment'
+USER_AGENT = 'Lectern-OPDS/1.0 (+https://github.com/duckhawk/lectern) metadata enrichment'
 
 # The API takes many bibkeys per call. Keep the batch well under the point where
 # the query string gets unwieldy; 50 ISBNs is ~750 characters.

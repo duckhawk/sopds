@@ -1,6 +1,6 @@
-#### SimpleOPDS Catalog - Простой OPDS Каталог
-#### Author: Dmitry V.Shelepnev  
-#### Версия 0.47-devel
+#### Lectern — OPDS-каталог
+#### Форк Simple OPDS (SOPDS), автор оригинала — Dmitry V. Shelepnev
+#### Текущая версия и список изменений — в CHANGELOG.md
 
 [English README.md](README.md)
 
@@ -10,7 +10,7 @@
 Загрузить архив с проектом можно с сайта www.sopds.ru, 
 либо из github.com следующей командой:
 
-	git clone https://github.com/mitshel/sopds.git
+	git clone https://github.com/duckhawk/lectern.git
 
 1.2 Зависимости.  
 - Требуется Python не ниже версии 3.4

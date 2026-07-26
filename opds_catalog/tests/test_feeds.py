@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.test import TestCase, Client
 from django.utils.translation import gettext as _
 
-from opds_catalog import opdsdb
+from opds_catalog import opdsdb, settings
 from constance import config
 
 
@@ -48,7 +48,12 @@ class feedsTestCase(TestCase):
         c = Client()
         response = c.get('/opds/search/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('www.sopds.ru', response.content.decode())
+        body = response.content.decode()
+        # The descriptor names this catalog and points at an icon we serve.
+        # It used to advertise SimpleOPDS and http://www.sopds.ru/favicon.ico.
+        self.assertIn(settings.TITLE, body)
+        self.assertIn(settings.ICON, body)
+        self.assertNotIn('sopds.ru', body)
         
     def test_SearchTypes(self):
         c = Client()
