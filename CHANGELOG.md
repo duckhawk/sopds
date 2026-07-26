@@ -15,6 +15,17 @@ All notable changes to this project are documented here. The format is based on
 - Tooling config in `pyproject.toml` (ruff, mypy); `CONTRIBUTING.md`.
 
 ### Changed
+- Covers and thumbnails answer conditional GETs. `/opds/cover/<id>/` and
+  `/opds/thumb/<id>/` now send an `ETag` derived from the containing file's
+  size and mtime — one `stat()`, no unzipping — so a reader revalidating with
+  `If-None-Match` gets a bodyless **304** instead of a re-extracted JPEG.
+  Behind that, the body cache is keyed on the ETag rather than on the URL as
+  `cache_page` was: replacing a book in place now invalidates its cover at
+  once instead of serving the previous one until `SOPDS_CACHE_TIME` ran out.
+  A book with no readable cover is cached as such, so it is not re-parsed on
+  every page view, and the responses are marked `Cache-Control: public` (they
+  carry no per-user content). `SOPDS_CACHE_TIME` is read per request, so
+  changing it in the admin no longer needs a restart.
 - Incremental scan no longer rewrites the whole `Book` table on every run. The
   start-of-scan `UPDATE opds_catalog_book SET avail=1` full-table sweep is
   replaced by a scratch `ScanSeen` table: the scanner records the id of each
@@ -41,6 +52,9 @@ All notable changes to this project are documented here. The format is based on
   binary container to the XML parser and returned **500**. Both reader views
   now raise `Http404` for anything but FB2 (matching the guard `ConvertFB2`
   already had), and the book list only offers the link where it works.
+- `/opds/thumb/` (the `covertmpl` route) returned **500**: it was wired to
+  `Cover`, which takes a mandatory `book_id`, so requesting it raised
+  `TypeError`. It now serves the no-cover placeholder it was meant to.
 - **Security:** the OIDC client secret and Telegram API token are entered
   through a masked password field in the constance admin instead of being
   shown in clear text.

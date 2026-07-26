@@ -49,7 +49,7 @@ urlpatterns = [
     re_path(r'^download/(?P<book_id>[0-9]+)/(?P<zip_flag>[0-1])/$',dl.Download, name='download'),
     re_path(r'^cover/(?P<book_id>[0-9]+)/$',dl.Cover, name='cover'),
     re_path(r'^thumb/(?P<book_id>[0-9]+)/$',dl.Thumbnail, name='thumb'),
-    re_path(r'^thumb/$',dl.Cover, name='covertmpl'),
+    re_path(r'^thumb/$',dl.NoCover, name='covertmpl'),
     re_path(r'^read/(?P<book_id>[0-9]+)/$', dl.ReadFB2, name='read'),
 
     re_path(r'^$',feeds.MainFeed(), name='main'),
