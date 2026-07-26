@@ -5,6 +5,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- The bookshelf can be narrowed by reading status
+  (`/web/search/books/?searchtype=u&status=reading`). Status has been set by
+  hand, and by an e-reader syncing progress since the kosync link, but the
+  shelf could only ever be shown whole. The filter is carried through
+  pagination, and an unrecognised value shows the whole shelf rather than an
+  unexplained empty one.
+
+### Removed
+- `Cover0`, the pre-0.41 FB2-only cover extractor. Nothing had referenced it
+  since; its only remaining mention was its own definition. The `base64` and
+  `fb2parse` imports it alone kept alive went with it.
+
 ## [0.50.0] - 2026-07-26
 
 First release of the Lectern fork. Everything below has accumulated since

@@ -268,10 +268,21 @@ def SearchBooksView(request):
             if config.SOPDS_AUTH:
                 books = Book.objects.filter(bookshelf__user=request.user).order_by('-bookshelf__readtime')
                 args['breadcrumbs'] = [_('Books'),_('Bookshelf'),request.user.username]
-                #books = bookshelf.objects.filter(user=request.user).select_related('book')              
+                #books = bookshelf.objects.filter(user=request.user).select_related('book')
+
+                # Reading status is set by hand and, since #71, by an e-reader
+                # syncing progress — but the shelf could only ever be shown
+                # whole. Filter it: ?searchtype=u&status=reading. An unknown
+                # value is ignored rather than yielding an empty shelf.
+                status = request.GET.get('status', '')
+                if status in {c[0] for c in bookshelf.STATUS_CHOICES if c[0]}:
+                    books = books.filter(bookshelf__user=request.user,
+                                         bookshelf__status=status)
+                    args['shelf_status'] = status
+                    args['breadcrumbs'].append(dict(bookshelf.STATUS_CHOICES)[status])
             else:
                 books = Book.objects.filter(id=0)
-                args['breadcrumbs'] = [_('Books'), _('Bookshelf')] 
+                args['breadcrumbs'] = [_('Books'), _('Bookshelf')]
             args['searchobject'] = 'title'
             args['isbookshelf'] = 1
                 
