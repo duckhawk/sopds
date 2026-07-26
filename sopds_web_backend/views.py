@@ -8,6 +8,8 @@ from django.db.models import Count, Min, Max, Prefetch
 from django.utils.translation import gettext as _
 from django.contrib.auth import authenticate, login, logout, REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import user_passes_test
+from django.contrib.auth import views as auth_views
+from django.contrib.auth.forms import UserCreationForm
 from django.views.decorators.vary import vary_on_headers
 from django.urls import reverse, reverse_lazy
 from django.utils.html import strip_tags
@@ -20,9 +22,10 @@ from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalo
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
-from opds_catalog import dl, ratings, stats
+from opds_catalog import dl, ratings, stats, throttle
 from constance import config
 from sopds_web_backend import oidc
+from sopds import email as mail
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
 
@@ -108,6 +111,9 @@ def sopds_processor(request):
     args['app_title'] = settings.TITLE
     args['sopds_auth'] = config.SOPDS_AUTH
     args['oidc_enabled'] = oidc.oidc_enabled()
+    args['allow_registration'] = config.SOPDS_ALLOW_REGISTRATION
+    # Offering a password reset that cannot be sent is worse than not offering it.
+    args['mail_configured'] = mail.is_configured()
     args['oidc_button_text'] = config.SOPDS_OIDC_BUTTON_TEXT
     args['sopds_version'] = settings.VERSION
     args['alphabet'] = config.SOPDS_ALPHABET_MENU
@@ -1168,6 +1174,124 @@ def BookReaderView(request, book_id):
     args['font_size'] = prefs.font_size
     args['css_file'] = prefs.theme_css
     return render(request, 'BookReader.html', args)
+
+
+# --- self-service accounts -------------------------------------------------
+#
+# Accounts could only be created, and passwords only changed, through the Django
+# admin. That is fine for one administrator and constant friction for everyone
+# else: a reader who forgot their password had to find a human.
+#
+# These lean on Django's own auth views for the parts where the security is in
+# the details — token generation and expiry for the reset flow, validator
+# enforcement for a new password — and only supply this project's chrome and a
+# throttle.
+
+
+def _account_form_args(request, **extra):
+    args = {'css_file': theme_css(request.user)}
+    args.update(csrf(request))
+    args.update(extra)
+    return args
+
+
+class SopdsPasswordChangeView(auth_views.PasswordChangeView):
+    template_name = 'sopds_password_change.html'
+    success_url = reverse_lazy('web:password_change_done')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(css_file=theme_css(self.request.user),
+                       breadcrumbs=[_('Settings'), _('Change password')])
+        return context
+
+
+class SopdsPasswordResetView(auth_views.PasswordResetView):
+    """Ask for a reset link.
+
+    Throttled on the same counter shape as the login form: this endpoint sends
+    mail to an address the caller chooses, which makes it usable both to spam a
+    stranger and to probe which addresses have accounts.
+    """
+    template_name = 'sopds_password_reset.html'
+    email_template_name = 'sopds_password_reset_email.txt'
+    subject_template_name = 'sopds_password_reset_subject.txt'
+    success_url = reverse_lazy('web:password_reset_done')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not mail.is_configured():
+            raise Http404('mail is not configured')
+        if request.method == 'POST' and _reset_is_blocked(request):
+            return handler403(request, _account_form_args(
+                request, system_message={'text': _('Too many attempts. Please try again later.'),
+                                         'type': 'alert'}))
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        _reset_register_attempt(self.request)
+        # Django's own view is what actually finds the user and sends the mail,
+        # and it deliberately reports success either way so this cannot be used
+        # to discover which addresses have accounts.
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(css_file=theme_css(self.request.user),
+                       breadcrumbs=[_('Login'), _('Reset password')])
+        return context
+
+
+def RegisterView(request):
+    """Create an account, when the administrator has allowed it.
+
+    Off by default. A private library usually wants its accounts made for it,
+    and a registration form left open on the internet is a way to acquire
+    strangers.
+    """
+    if not config.SOPDS_ALLOW_REGISTRATION:
+        raise Http404('registration is disabled')
+
+    if request.user.is_authenticated:
+        return redirect(reverse('web:main'))
+
+    form = UserCreationForm(request.POST or None)
+    if request.method == 'POST':
+        if _reset_is_blocked(request):
+            return handler403(request, _account_form_args(
+                request, system_message={'text': _('Too many attempts. Please try again later.'),
+                                         'type': 'alert'}))
+        _reset_register_attempt(request)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect(reverse('web:main'))
+
+    return render(request, 'sopds_register.html',
+                  _account_form_args(request, form=form,
+                                     breadcrumbs=[_('Login'), _('Register')]))
+
+
+# Registration and password-reset attempts share one counter: both create work
+# for someone else (a row, or a message to an address the caller chose), and
+# both are worth limiting per client rather than per form.
+ACCOUNT_RATE_LIMIT = 10
+ACCOUNT_RATE_WINDOW = 600
+
+
+def _reset_key(request):
+    return 'ratelimit:account:%s' % throttle.client_id(request)
+
+
+def _reset_is_blocked(request):
+    return cache.get(_reset_key(request), 0) >= ACCOUNT_RATE_LIMIT
+
+
+def _reset_register_attempt(request):
+    key = _reset_key(request)
+    try:
+        cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, ACCOUNT_RATE_WINDOW)
 
 
 def handler403(request, args):

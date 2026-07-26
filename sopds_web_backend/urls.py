@@ -1,5 +1,6 @@
 
-from django.urls import re_path
+from django.urls import re_path, reverse_lazy
+from django.contrib.auth import views as auth_views
 from sopds_web_backend import views
 
 app_name = 'opds_web_backend'
@@ -20,6 +21,23 @@ urlpatterns = [
     re_path(r'^settings/$',views.SettingsView, name='settings'),
     re_path(r'^sync/$',views.DeviceSyncView, name='devicesync'),
     re_path(r'^login/$',views.LoginView, name='login'),
+
+    # Self-service accounts. The reset flow is Django's own — the security is in
+    # the token generation and expiry, which is not worth reimplementing.
+    re_path(r'^register/$', views.RegisterView, name='register'),
+    re_path(r'^password/change/$', views.SopdsPasswordChangeView.as_view(), name='password_change'),
+    re_path(r'^password/change/done/$', auth_views.PasswordChangeDoneView.as_view(
+        template_name='sopds_password_change_done.html'), name='password_change_done'),
+    re_path(r'^password/reset/$', views.SopdsPasswordResetView.as_view(), name='password_reset'),
+    re_path(r'^password/reset/sent/$', auth_views.PasswordResetDoneView.as_view(
+        template_name='sopds_password_reset_done.html'), name='password_reset_done'),
+    re_path(r'^password/reset/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[^/]+)/$',
+            auth_views.PasswordResetConfirmView.as_view(
+                template_name='sopds_password_reset_confirm.html',
+                success_url=reverse_lazy('web:password_reset_complete')),
+            name='password_reset_confirm'),
+    re_path(r'^password/reset/done/$', auth_views.PasswordResetCompleteView.as_view(
+        template_name='sopds_password_reset_complete.html'), name='password_reset_complete'),
     re_path(r'^oidc/login/$',views.OIDCLoginView, name='oidc_login'),
     re_path(r'^oidc/callback/$',views.OIDCCallbackView, name='oidc_callback'),
     re_path(r'^logout/$',views.LogoutView, name='logout'),

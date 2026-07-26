@@ -237,6 +237,11 @@ else:
         }
     }
 
+# Mail goes through a backend that reads its host and credentials from constance,
+# so an operator fixes a failing password reset in the admin rather than through
+# a redeploy. See sopds/email.py.
+EMAIL_BACKEND = 'sopds.email.ConstanceEmailBackend'
+
 # Logging: tag every line with the request it belongs to. Several uwsgi workers
 # interleave their output and an e-reader polling feeds produces a lot of it, so
 # without the tag a report of "a download failed a few minutes ago" has to be
@@ -350,6 +355,16 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_OIDC_SCOPES', ('openid email profile', _('OIDC scopes (space-separated)'))),
     ('SOPDS_OIDC_BUTTON_TEXT', ('Log in with Keycloak', _('Text on the OIDC login button'))),
 
+    ('SOPDS_ALLOW_REGISTRATION', (False, _('Let visitors create their own account on the login page'))),
+
+    ('SOPDS_SMTP_HOST', ('', _('SMTP server for password resets and sending books to a device (empty = mail disabled)'))),
+    ('SOPDS_SMTP_PORT', (587, _('SMTP port'))),
+    ('SOPDS_SMTP_USER', ('', _('SMTP username'))),
+    ('SOPDS_SMTP_PASSWORD', ('', _('SMTP password'), 'password_input')),
+    ('SOPDS_SMTP_TLS', (True, _('Use STARTTLS'))),
+    ('SOPDS_SMTP_SSL', (False, _('Use implicit TLS (SMTPS). Mutually exclusive with STARTTLS.'))),
+    ('SOPDS_MAIL_FROM', ('', _('From address for outgoing mail'))),
+
     ('SOPDS_RATE_LIMIT', (600, _('Max requests per minute per reader for downloads, covers and the reader (0 = no limit)'))),
 
     ('SOPDS_METRICS_ENABLE', (False, _('Expose Prometheus metrics at /metrics'))),
@@ -372,7 +387,8 @@ CONSTANCE_CONFIG_FIELDSETS = {
     '7. Log & PID Files': ('SOPDS_SERVER_LOG', 'SOPDS_SCANNER_LOG', 'SOPDS_TELEBOT_LOG','SOPDS_SERVER_PID','SOPDS_SCANNER_PID','SOPDS_TELEBOT_PID'),
     '8. OIDC (Keycloak)': ('SOPDS_OIDC_ENABLE', 'SOPDS_OIDC_ISSUER', 'SOPDS_OIDC_CLIENT_ID', 'SOPDS_OIDC_CLIENT_SECRET', 'SOPDS_OIDC_SCOPES', 'SOPDS_OIDC_BUTTON_TEXT'),
     '9. Reading Progress Sync': ('SOPDS_KOSYNC_ENABLE', 'SOPDS_KOSYNC_ALLOW_REGISTER', 'SOPDS_WEBDAV_ENABLE', 'SOPDS_WEBDAV_ROOT'),
-    '10. Monitoring': ('SOPDS_RATE_LIMIT', 'SOPDS_METRICS_ENABLE', 'SOPDS_METRICS_TOKEN'),
+    '10. Accounts & Mail': ('SOPDS_ALLOW_REGISTRATION', 'SOPDS_SMTP_HOST', 'SOPDS_SMTP_PORT', 'SOPDS_SMTP_USER', 'SOPDS_SMTP_PASSWORD', 'SOPDS_SMTP_TLS', 'SOPDS_SMTP_SSL', 'SOPDS_MAIL_FROM'),
+    '11. Monitoring': ('SOPDS_RATE_LIMIT', 'SOPDS_METRICS_ENABLE', 'SOPDS_METRICS_TOKEN'),
 }
 
 
