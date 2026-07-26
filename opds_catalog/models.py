@@ -19,6 +19,7 @@ SIZE_BOOK_LANG       = 16
 SIZE_BOOK_TITLE      = 512
 SIZE_BOOK_ANNOTATION = 10000
 SIZE_BOOK_ISBN       = 20
+SIZE_BOOK_PUBLISHER  = 128
 
 SIZE_CAT_CATNAME     = 190
 SIZE_CAT_PATH        = SIZE_BOOK_PATH
@@ -53,6 +54,12 @@ class Book(models.Model):
     search_title = models.CharField(max_length=SIZE_BOOK_TITLE, default='', db_index=True)
     annotation = models.CharField(max_length=SIZE_BOOK_ANNOTATION)
     isbn = models.CharField(max_length=SIZE_BOOK_ISBN, default='', blank=True, db_index=True)
+    # Filled by `sopds_enrich` from Open Library, not by the scanner: FB2/EPUB
+    # metadata rarely carries a usable publisher, and no parser reads one.
+    publisher = models.CharField(max_length=SIZE_BOOK_PUBLISHER, default='', blank=True)
+    # When the last successful Open Library lookup ran, so re-runs skip books
+    # already tried instead of asking the API about them again.
+    enriched = models.DateTimeField(null=True, default=None, db_index=True)
     lang_code = models.IntegerField(null=False, default=9, db_index=True)
     avail = models.IntegerField(null=False, default=0, db_index=True)
     authors = models.ManyToManyField('Author', through='bauthor')

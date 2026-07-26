@@ -21,6 +21,19 @@ All notable changes to this project are documented here. The format is based on
   title box searches the ISBN instead of coming back empty; terms are
   normalised, so hyphenated, spaced and `ISBN`-prefixed forms all work.
   Russian translations included.
+- **`sopds_enrich` — metadata from Open Library, keyed on the ISBN.** FB2/EPUB
+  files from a typical collection carry a title, an author and little else, and
+  no format we parse records a publisher at all. Where a book has an ISBN, the
+  command fills its empty annotation, publication date and publisher from the
+  Open Library Books API. Only empty fields are filled — the file is the
+  authority on its own contents, and an ISBN can be shared by editions that
+  differ in the details — unless `--force` is given. Migration `0020` adds the
+  `publisher` and `enriched` columns; the latter keeps a re-run from asking
+  about books already tried, including the ones Open Library had nothing for.
+  A lookup that fails (timeout, 5xx, malformed reply) is reported as a failure
+  rather than a miss, so an outage leaves those books queued for the next run.
+  `--dry-run`, `--limit`, `--batch-size` and `--sleep` (default 1s between
+  calls) as usual. Russian translations included.
 - htmx live-search suggestions in the header search box (title/author/series),
   as progressive enhancement.
 - Title suggestions now show the book's first author next to the title, so

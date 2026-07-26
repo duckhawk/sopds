@@ -352,6 +352,7 @@ def SearchBooksView(request):
                  'format': row.format,
                  'title': row.title,
                  'isbn': row.isbn,
+                 'publisher': row.publisher,
                  'filesize': row.filesize // 1000,
                  'authors': row.authors.all(),
                  'genres': row.genres.all(),

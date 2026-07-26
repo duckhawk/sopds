@@ -246,7 +246,7 @@ class CatalogsFeed(AuthFeed):
         for row in page_books[op.d2_first_pos:op.d2_last_pos+1]:
             p = {'is_catalog':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
                   'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
-                  'docdate': row.docdate, 'format': row.format, 'title': row.title, 'isbn': row.isbn, 'filesize': row.filesize//1000,
+                  'docdate': row.docdate, 'format': row.format, 'title': row.title, 'isbn': row.isbn, 'publisher': row.publisher, 'filesize': row.filesize//1000,
                   'authors':[{'id': a.id, 'full_name': a.full_name} for a in row.authors.all()],
                   'genres':[{'id': g.id, 'subsection': g.subsection} for g in row.genres.all()],
                   'series':[{'id': s.id, 'ser': s.ser} for s in row.series.all()],
@@ -517,7 +517,7 @@ class SearchBooksFeed(AuthFeed):
         for row in page_rows:
             p = {'doubles':0, 'lang_code': row.lang_code, 'filename': row.filename, 'path': row.path, \
                   'registerdate': row.registerdate, 'id': row.id, 'annotation': strip_tags(row.annotation), \
-                  'docdate': row.docdate, 'format': row.format, 'title': row.title, 'isbn': row.isbn, 'filesize': row.filesize//1000,
+                  'docdate': row.docdate, 'format': row.format, 'title': row.title, 'isbn': row.isbn, 'publisher': row.publisher, 'filesize': row.filesize//1000,
                   'authors':[{'id': a.id, 'full_name': a.full_name} for a in row.authors.all()],
                   'genres':[{'id': g.id, 'subsection': g.subsection} for g in row.genres.all()],
                   'series':[{'id': s.id, 'ser': s.ser} for s in row.series.all()],
@@ -632,11 +632,12 @@ class SearchBooksFeed(AuthFeed):
         if item['series']: s += _("<b>Series: </b>%(series)s<br/>")
         if item['ser_no']: s += _("<b>No in Series: </b>%(ser_no)s<br/>")
         if item['isbn']: s += _("<b>ISBN: </b>%(isbn)s<br/>")
+        if item['publisher']: s += _("<b>Publisher: </b>%(publisher)s<br/>")
         s += _("<b>File: </b>%(filename)s<br/><b>File size: </b>%(filesize)s<br/><b>Changes date: </b>%(docdate)s<br/>")
         if item['doubles']: s += _("<b>Doubles count: </b>%(doubles)s<br/>")
         s +="<p class='book'>%(annotation)s</p>"
         return s%{'title':item['title'],'filename':item['filename'], 'filesize':item['filesize'],'docdate':item['docdate'],
-                  'doubles':item['doubles'],'annotation':item['annotation'],'isbn':item['isbn'],
+                  'doubles':item['doubles'],'annotation':item['annotation'],'isbn':item['isbn'],'publisher':item['publisher'],
                   'authors':", ".join(a['full_name'] for a in item['authors']),
                   'genres':", ".join(g['subsection'] for g in item['genres']),
                   'series':", ".join(s['ser'] for s in item['series']),

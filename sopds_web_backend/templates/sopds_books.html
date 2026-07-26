@@ -75,6 +75,9 @@
 				   {# Links to the ISBN search, which finds the other editions of the same book. #}
 				   <b>{% trans "ISBN:" %}</b> <a href="{% url "web:searchbooks" %}?searchtype=x&searchterms={{b.isbn}}">{{ b.isbn }}</a> <br>
 				{% endif %}
+				{% if b.publisher %}
+				   <b>{% trans "Publisher:" %}</b> {{ b.publisher }} <br>
+				{% endif %}
 				<b>{% trans "File:" %}</b> {{ b.path }}/{{ b.filename }} <br>
 				<b>{% trans "File size:" %}</b> {{ b.filesize }}Кб.<br>
 				<b>{% trans "Changes date:" %}</b> {{ b.docdate }} <br>	
