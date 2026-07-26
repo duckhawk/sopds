@@ -153,6 +153,17 @@ class Command(BaseCommand):
             # atomic on its own), so it is not wrapped in one giant transaction.
             scanner.scan_all()
             Counter.objects.update_known_counters()
+            # Give the books this scan added their KOReader document hashes, so
+            # progress synced from an e-reader can still name a book. Imported
+            # here rather than at module scope to keep the catalog app's import
+            # graph free of the sync app; the call is a no-op when kosync is off
+            # and swallows its own errors, because failing to index digests must
+            # not fail the scan that produced them.
+            from sopds_sync import indexing
+            indexed = indexing.index_new_books()
+            if indexed:
+                self.logger.info('kosync: indexed %d book(s), %d digest(s) added',
+                                 indexed['books'], indexed['added'])
             # Reclaim the dead tuples the avail sweep churns and refresh stats /
             # the visibility map, so post-scan reads keep their Index-Only Scans
             # instead of slowing to tens of seconds until autovacuum catches up.
