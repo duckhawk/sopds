@@ -108,6 +108,13 @@ All notable changes to this project are documented here. The format is based on
   uses `-c`), so the test environment never drifts from production.
 
 ### Fixed
+- The kosync digest index is now refreshed by the scan. It was only ever built
+  by running `sopds_kosync_index` by hand, so every book added afterwards was
+  invisible to the matcher: progress from an e-reader still synced, it just
+  stopped being attributed to a book, and nothing said so. The scanner indexes
+  what it added at the end of each run — idempotent, a no-op when kosync is
+  off, and it swallows its own errors, because failing to index digests must
+  not fail the scan that produced them.
 - The whole web UI returned **500 for every visitor when `SOPDS_AUTH` is off**.
   `sopds_login` lets anonymous visitors through in that configuration — which
   is the point of it — but every view then called `theme_css(request.user)`,
