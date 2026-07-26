@@ -11,6 +11,8 @@
 	{% if not parent_id %}
 	   <a href="{% url "web:genre" %}?section={{g.section_id}}">{{ g.section }}</a>
 	{% else %}
+	   {# Search results come from anywhere in the tree, so name the section too. #}
+	   {% if is_search %}<span style="opacity:.7">{{ g.section }} / </span>{% endif %}
 	   <a href="{% url "web:searchbooks" %}?searchtype=g&searchterms={{g.id}}">{{ g.subsection }}</a>
 	{% endif %}
 	<span style="font-size:80%">{% blocktrans with g_num_book=g.num_book %}Total: {{ g_num_book }} books.{% endblocktrans %}</span>

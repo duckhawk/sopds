@@ -52,13 +52,14 @@
           </div>
 
           <details class="lx-searchtype">
-            <summary aria-label="{% trans "Choose Search Type:" %}"><span class="lx-searchtype-label" id="searchtype-label">{% if searchobject == "author" %}{% trans "Author" %}{% elif searchobject == "series" %}{% trans "Series" %}{% else %}{% trans "Title" %}{% endif %}</span></summary>
+            <summary aria-label="{% trans "Choose Search Type:" %}"><span class="lx-searchtype-label" id="searchtype-label">{% if searchobject == "author" %}{% trans "Author" %}{% elif searchobject == "series" %}{% trans "Series" %}{% elif searchobject == "genre" %}{% trans "Genre" %}{% else %}{% trans "Title" %}{% endif %}</span></summary>
             <div class="lx-searchtype-pane">
               <fieldset>
                 <legend>{% trans "Choose Search Type:" %}</legend>
                 <input type="radio" name="searchtype" value="m" id="title" onClick="SetSearch()" {% if searchobject == "title" or not searchobject %}checked{% endif %}><label for="title">{% trans "Title" %}</label>
                 <input type="radio" name="searchtype" value="m" id="author" onClick="SetSearch()" {% if searchobject == "author" %}checked{% endif %}><label for="author">{% trans "Author" %}</label>
                 <input type="radio" name="searchtype" value="m" id="series" onClick="SetSearch()" {% if searchobject == "series" %}checked{% endif %}><label for="series">{% trans "Series" %}</label>
+                <input type="radio" name="searchtype" value="m" id="genre" onClick="SetSearch()" {% if searchobject == "genre" %}checked{% endif %}><label for="genre">{% trans "Genre" %}</label>
               </fieldset>
             </div>
           </details>
@@ -124,6 +125,7 @@
     if (searchtype == "title")  form.setAttribute("action", "{% url "web:searchbooks" %}");
     if (searchtype == "author") form.setAttribute("action", "{% url "web:searchauthors" %}");
     if (searchtype == "series") form.setAttribute("action", "{% url "web:searchseries" %}");
+    if (searchtype == "genre")  form.setAttribute("action", "{% url "web:searchgenres" %}");
     var d = document.querySelector('.lx-searchtype');
     if (d) d.removeAttribute('open');
     document.getElementById('search-suggestions').innerHTML = '';

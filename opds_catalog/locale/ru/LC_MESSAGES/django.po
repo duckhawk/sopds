@@ -135,6 +135,7 @@ msgstr "Поиск книг по ISBN"
 #, python-format
 msgid "<b>ISBN: </b>%(isbn)s<br/>"
 msgstr "<b>ISBN: </b>%(isbn)s<br/>"
+
 #: .\opds_catalog\feeds.py:628
 #, python-format
 msgid "<b>Publisher: </b>%(publisher)s<br/>"
@@ -167,6 +168,18 @@ msgstr "Самые скачиваемые книги коллекции. Кни�
 #, python-format
 msgid "<b>Downloads: </b>%(downloads)s<br/>"
 msgstr "<b>Скачиваний: </b>%(downloads)s<br/>"
+
+#: .\opds_catalog\feeds.py:376
+msgid "Search by genre"
+msgstr "Поиск по жанру"
+
+#: .\opds_catalog\feeds.py:376
+msgid "Search genres by name"
+msgstr "Поиск жанров по названию"
+
+#: .\opds_catalog\feeds.py:1030
+msgid "Genres found"
+msgstr "Найдены жанры"
 
 #: .\opds_catalog\feeds.py:357 .\opds_catalog\tests\test_feeds.py:60
 msgid "Search by titles"

@@ -49,6 +49,9 @@ urlpatterns = [
     re_path(r'^search/series/(?P<searchtype>[bmae])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchSeriesFeed(), name='searchseries'),
     re_path(r'^search/series/(?P<searchtype>[bmae])/(?P<searchterms>.+)/$',feeds.SearchSeriesFeed(), name='searchseries'),
 
+    re_path(r'^search/genres/(?P<searchtype>[bme])/(?P<searchterms>.+)/(?P<page>\d+)/$',feeds.SearchGenresFeed(), name='searchgenres'),
+    re_path(r'^search/genres/(?P<searchtype>[bme])/(?P<searchterms>.+)/$',feeds.SearchGenresFeed(), name='searchgenres'),
+
     re_path(r'^search/(?P<searchterms>.+)/$',feeds.SearchTypesFeed(), name='searchtypes'),
     
     re_path(r'^convert/(?P<book_id>[0-9]+)/(?P<convert_type>epub|mobi)/$',dl.ConvertFB2, name='convert'),
