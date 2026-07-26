@@ -8,13 +8,13 @@ from django.http import Http404
 from django.db.models import Count, Min
 from django.utils.html import strip_tags
 
-from opds_catalog.models import Book, Catalog, Author, Genre, Series, Tag, bookshelf, Counter, BookStat
+from opds_catalog.models import Book, Catalog, Author, Genre, Series, Tag, Collection, bookshelf, Counter, BookStat
 from opds_catalog import models
 from opds_catalog import settings
 from opds_catalog.middleware import BasicAuthMiddleware
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
-from opds_catalog import ratings, stats, tags
+from opds_catalog import collections, ratings, stats, tags
 
 from book_tools.format import mime_detector
 from book_tools.format.mimetype import Mimetype
@@ -180,6 +180,8 @@ class MainFeed(AuthFeed):
                      "descr": _("Most downloaded from the collection. Books taken: %(taken)s."),"counters":{"taken":BookStat.objects.filter(downloads__gt=0).count()}},
                     {"id":10, "title":_("By tags"), "link":"opds_catalog:tags",
                      "descr": _("Labels this library's readers put on books. Tags: %(tags)s."),"counters":{"tags":Tag.objects.filter(btag__isnull=False).distinct().count()}},
+                    {"id":11, "title":_("Collections"), "link":"opds_catalog:collections",
+                     "descr": _("Lists of books. Collections: %(collections)s."),"counters":{"collections":len(collections.visible(self.request.user))}},
                     {"id":1, "title":_("By catalogs"), "link":"opds_catalog:catalogs",
                      "descr": _("Catalogs: %(catalogs)s, books: %(books)s."),"counters":{"catalogs":Counter.objects.get_counter(models.counter_allcatalogs),"books":Counter.objects.get_counter(models.counter_allbooks)}},
                     {"id":2, "title":_("By authors"), "link":("opds_catalog:lang_authors" if config.SOPDS_ALPHABET_MENU else "opds_catalog:nolang_authors"),
@@ -496,6 +498,17 @@ class SearchBooksFeed(AuthFeed):
         # Самые скачиваемые книги (searchterms не используется)
         elif searchtype == 'p':
             books = stats.most_popular()
+        # Книги из подборки
+        elif searchtype == 'c':
+            try:
+                collection = Collection.objects.get(id=int(searchterms))
+            except (TypeError, ValueError, Collection.DoesNotExist):
+                raise Http404
+            # 404 rather than 403 for someone else's private list: its
+            # existence is not confirmed either.
+            if not collection.visible_to(request.user):
+                raise Http404
+            books = collections.books_in(collection)
         # Книги с заданным тегом
         elif searchtype == 't':
             try:
@@ -980,6 +993,50 @@ class SearchGenresFeed(AuthFeed):
     def item_link(self, item):
         return reverse("opds_catalog:searchbooks",
                        kwargs={"searchtype":"g", "searchterms":item['id']})
+
+    def item_enclosures(self, item):
+        return (opdsEnclosure(self.item_link(item),"application/atom+xml;profile=opds-catalog;kind=navigation", "subsection"),)
+
+class CollectionsFeed(AuthFeed):
+    """The caller's own lists, plus anyone's that were shared."""
+    feed_type = opdsFeed
+    subtitle = settings.SUBTITLE
+
+    def title(self, obj):
+        return "%s | %s"%(settings.TITLE,_("Collections"))
+
+    def link(self, obj):
+        return reverse("opds_catalog:collections")
+
+    def get_object(self, request):
+        return list(collections.visible(request.user))
+
+    def feed_extra_kwargs(self, obj):
+        return {
+                "searchTerm_url":"%s%s"%(reverse("opds_catalog:opensearch"),'{searchTerms}/'),
+                "start_url":reverse("opds_catalog:main"),
+                "description_mime_type":"text",
+        }
+
+    def items(self, obj):
+        return obj
+
+    def item_title(self, item):
+        # Whose list it is matters when the feed mixes yours with other
+        # people's, and a reader browsing on an e-reader has no other cue.
+        if self.request.user.is_authenticated and item.user_id == self.request.user.pk:
+            return item.name
+        return "%s (%s)"%(item.name, item.user.username)
+
+    def item_description(self, item):
+        return _("Books count: %s")%item.book_count
+
+    def item_guid(self, item):
+        return "c:%s"%item.id
+
+    def item_link(self, item):
+        return reverse("opds_catalog:searchbooks",
+                       kwargs={"searchtype":"c", "searchterms":item.id})
 
     def item_enclosures(self, item):
         return (opdsEnclosure(self.item_link(item),"application/atom+xml;profile=opds-catalog;kind=navigation", "subsection"),)

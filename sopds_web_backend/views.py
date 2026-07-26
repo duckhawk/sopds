@@ -18,11 +18,11 @@ from django.http import HttpResponseForbidden, HttpResponseRedirect
 
 
 from opds_catalog import models
-from opds_catalog.models import Book, Author, Series, bookshelf, Counter, Catalog, Genre, Tag, lang_menu, Theme
+from opds_catalog.models import Book, Author, Series, bookshelf, Collection, Counter, Catalog, Genre, Tag, lang_menu, Theme
 from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
-from opds_catalog import delivery, dl, ratings, stats, tags, throttle
+from opds_catalog import collections, delivery, dl, ratings, stats, tags, throttle
 from constance import config
 from sopds_web_backend import oidc
 from sopds import email as mail
@@ -263,6 +263,21 @@ def SearchBooksView(request):
             args['breadcrumbs'] = [_('Books'), _('Top rated')]
             args['searchobject'] = 'title'
 
+        # Книги из подборки
+        elif searchtype == 'c':
+            try:
+                collection = Collection.objects.select_related('user').get(id=int(searchterms))
+            except (TypeError, ValueError, Collection.DoesNotExist):
+                raise Http404
+            # A private list is nobody else's business; 404 rather than 403, so
+            # its existence is not confirmed either.
+            if not collection.visible_to(request.user):
+                raise Http404
+            books = collections.books_in(collection)
+            args['breadcrumbs'] = [_('Collections'), collection.name]
+            args['searchobject'] = 'title'
+            args['collection'] = collection
+
         # Книги с заданным тегом
         elif searchtype == 't':
             try:
@@ -384,6 +399,7 @@ def SearchBooksView(request):
         page_ratings = ratings.summary(r.id for r in page_rows)
         page_stats = stats.summary(r.id for r in page_rows)
         page_tags = tags.for_books(r.id for r in page_rows)
+        page_collections = collections.containing(request.user, (r.id for r in page_rows))
         # One check for the page, not one per book: it depends on the reader
         # and the server, never on the book.
         can_send = delivery.can_send(request.user)
@@ -418,6 +434,7 @@ def SearchBooksView(request):
                  'sendable': can_send,
                  'tags': page_tags.get(row.id, []),
                  'tags_editable': config.SOPDS_TAGS_EDITABLE,
+                 'in_collections': page_collections.get(row.id, []),
                  # Percentage read, as reported by an e-reader over kosync.
                  'percent': user_shelf[0].percent if user_shelf else None
                  }
@@ -469,6 +486,7 @@ def SearchBooksView(request):
         # The list renders this user's mutable state (shelf/status/rating), so it
         # must not be served stale from cache.
         args['cache_t'] = 0
+        args['my_collections'] = list(collections.owned(request.user))
         args['css_file'] = theme_css(request.user)
 
     return render(request, 'sopds_books.html', args)
@@ -995,6 +1013,82 @@ def BSSetStatus(request, book_id):
     obj.status = status
     obj.save(update_fields=['status'])
     return JsonResponse({'ok': True, 'status': status})
+
+
+@vary_on_headers("HTTP_ACCEPT_LANGUAGE")
+@sopds_login(url='web:login')
+def CollectionsView(request):
+    """Your lists, and anyone's that were shared."""
+    return render(request, 'sopds_collections.html', {
+        'items': collections.visible(request.user),
+        'current': 'collections',
+        'breadcrumbs': [_('Collections')],
+        'cache_t': 0,          # per-user and changes on every edit
+        'css_file': theme_css(request.user),
+    })
+
+
+@sopds_login(url='web:login')
+@personal_view
+def CollectionCreate(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+
+    collection = collections.create(request.user, request.POST.get('name', ''),
+                                    shared=request.POST.get('shared') == '1')
+    if collection is None:
+        return JsonResponse({'ok': False, 'error': str(_('That list could not be created.'))},
+                            status=400)
+    return JsonResponse({'ok': True, 'id': collection.id, 'name': collection.name})
+
+
+def _own_collection(request, collection_id):
+    """A list this reader owns, or 404. Sharing grants reading, never writing."""
+    return get_object_or_404(Collection, id=collection_id, user=request.user)
+
+
+@sopds_login(url='web:login')
+@personal_view
+def CollectionDelete(request, collection_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    _own_collection(request, collection_id).delete()
+    return JsonResponse({'ok': True})
+
+
+@sopds_login(url='web:login')
+@personal_view
+def CollectionShare(request, collection_id):
+    """Publish a list to the library, or take it back."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+
+    collection = _own_collection(request, collection_id)
+    collection.shared = request.POST.get('shared') == '1'
+    collection.save(update_fields=['shared'])
+    return JsonResponse({'ok': True, 'shared': collection.shared})
+
+
+@sopds_login(url='web:login')
+@personal_view
+def CollectionAddBook(request, collection_id, book_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+
+    collection = _own_collection(request, collection_id)
+    book = get_object_or_404(Book, id=book_id)
+    return JsonResponse({'ok': True, 'added': collections.add_book(collection, book)})
+
+
+@sopds_login(url='web:login')
+@personal_view
+def CollectionRemoveBook(request, collection_id, book_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+
+    collection = _own_collection(request, collection_id)
+    book = get_object_or_404(Book, id=book_id)
+    return JsonResponse({'ok': True, 'removed': collections.remove_book(collection, book)})
 
 
 @sopds_login(url='web:login')
