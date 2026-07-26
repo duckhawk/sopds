@@ -27,6 +27,15 @@ All notable changes to this project are documented here. The format is based on
   uses `-c`), so the test environment never drifts from production.
 
 ### Fixed
+- The whole web UI returned **500 for every visitor when `SOPDS_AUTH` is off**.
+  `sopds_login` lets anonymous visitors through in that configuration — which
+  is the point of it — but every view then called `theme_css(request.user)`,
+  which filtered `Theme` by an `AnonymousUser` (`TypeError: Field 'id'
+  expected a number`). Browsing pages and the reader now fall back to the
+  default theme and preferences, and the genuinely per-user endpoints (theme
+  toggle, settings, device sync, bookshelf add/delete/clear, reading position,
+  status, rating) answer **403** instead of raising, since with authentication
+  off there is no user to own that data.
 - **Security:** the OIDC client secret and Telegram API token are entered
   through a masked password field in the constance admin instead of being
   shown in clear text.
