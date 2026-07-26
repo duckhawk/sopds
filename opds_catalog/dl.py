@@ -470,6 +470,13 @@ def ReadFB2(request, book_id):
     """ Загрузка книги """
     book = get_object_or_404(Book, id=book_id)
 
+    # The reader renders a book by running FB2_22_xhtml.xsl over its XML, so it
+    # only works for FB2. Anything else reached ET.parse() and died there with a
+    # 500 (an EPUB or MOBI is a binary container, not XML). Mirror the guard
+    # ConvertFB2 already has.
+    if book.format != 'fb2':
+        raise Http404
+
     if config.SOPDS_AUTH and request.user.is_authenticated:
         bookshelf.objects.get_or_create(user=request.user, book=book)
 
