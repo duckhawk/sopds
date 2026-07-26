@@ -5,6 +5,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`sopds_userdata_export` / `sopds_userdata_import`** — a backup for the part
+  of the database a rescan cannot rebuild: shelves, statuses, ratings, reading
+  positions, progress synced from e-readers, reader preferences, download and
+  read counters, and the ISBNs, publishers, annotations and dates
+  `sopds_enrich` fetched at the cost of a request each.
+  `dumpdata` does not serve here. Every one of those tables points at `Book` by
+  id, and a rebuilt catalogue assigns different ids, so a restored shelf would
+  name the wrong books. The export keys on identity that survives a rebuild
+  instead: the `(path, filename)` pair the scanner itself uses to recognise a
+  book, falling back to the content digest for a book renamed since. Restoring
+  never overwrites what is already there unless `--force`, so it is safe
+  against a live catalogue and not only into an empty one; counters only ever
+  go up; and anything that cannot be matched is counted and reported rather
+  than guessed at.
+
 ### Fixed
 - **An unreachable Redis no longer returns 500 for every page.** Django's
   `RedisCache` lets connection errors out, and the catalogue reads the cache in
