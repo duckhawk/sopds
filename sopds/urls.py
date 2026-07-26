@@ -25,6 +25,7 @@ from sopds import health
 urlpatterns = [
     re_path(r'^healthz/?$', health.healthz),
     re_path(r'^readyz/?$', health.readyz),
+    re_path(r'^metrics/?$', health.metrics_view),
     re_path(r'^opds/', include('opds_catalog.urls', namespace='opds')),
     re_path(r'^web/', include('sopds_web_backend.urls', namespace='web')),
     re_path(r'^kosync/', include('sopds_sync.kosync_urls', namespace='kosync')),
