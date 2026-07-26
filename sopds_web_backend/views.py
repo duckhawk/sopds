@@ -1,3 +1,4 @@
+from functools import wraps
 from random import randint
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -11,7 +12,7 @@ from django.views.decorators.vary import vary_on_headers
 from django.urls import reverse, reverse_lazy
 from django.utils.html import strip_tags
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseForbidden, HttpResponseRedirect
 
 
 from opds_catalog import models
@@ -36,6 +37,9 @@ def _int_param(request, name, default=0):
         return default
 
 
+DEFAULT_THEME_CSS = "css/sopds.css"
+
+
 def theme_css(user):
     """Return the user's theme key in a single query (instead of exists()+get()).
 
@@ -43,15 +47,47 @@ def theme_css(user):
     theme keys, not real files: the single lectern.css stylesheet is always
     loaded and sopds_main.html selects light/dark via `data-theme` from whether
     this key contains "dark".
+
+    An anonymous visitor (which every visitor is when SOPDS_AUTH is off) has no
+    row and cannot be used as a filter value, so they get the default.
     """
+    if not user.is_authenticated:
+        return DEFAULT_THEME_CSS
+
     theme = Theme.objects.filter(user=user).first()
-    return theme.theme_css if theme else "css/sopds.css"
+    return theme.theme_css if theme else DEFAULT_THEME_CSS
 
 
 def user_prefs(user):
-    """Per-user preferences row (theme + reader settings), created on demand."""
+    """Per-user preferences row (theme + reader settings), created on demand.
+
+    Anonymous visitors get an unsaved row of defaults: there is nobody to own
+    the preferences, but the reader still has to render.
+    """
+    if not user.is_authenticated:
+        return Theme(theme_css=DEFAULT_THEME_CSS)
+
     prefs, _ = Theme.objects.get_or_create(user=user)
     return prefs
+
+
+def personal_view(function):
+    """Guard for views that read or write one specific user's rows.
+
+    `sopds_login` deliberately lets everyone through when SOPDS_AUTH is off, and
+    that is right for browsing the catalogue. It is not right for the bookshelf,
+    the theme toggle or the sync password: those filter `Theme`/`bookshelf`/
+    `KosyncCredential` by `request.user`, and an `AnonymousUser` is not a value
+    the ORM can filter on — every one of them raised TypeError and returned 500.
+    With authentication off there is no user to own that data, so answer 403.
+    """
+    @wraps(function)
+    def _wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return HttpResponseForbidden(_('This page requires a signed-in user.'))
+        return function(request, *args, **kwargs)
+
+    return _wrapped
 
 
 def sopds_login(function=None, redirect_field_name=REDIRECT_FIELD_NAME, url=None):
@@ -358,6 +394,7 @@ def SearchBooksView(request):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+@personal_view
 def ThemeView(request):
     theme = Theme.objects.filter(user=request.user).first()
     if theme:
@@ -370,6 +407,7 @@ def ThemeView(request):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+@personal_view
 def SettingsView(request):
     prefs = user_prefs(request.user)
     if request.method == 'POST':
@@ -397,6 +435,7 @@ def SettingsView(request):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+@personal_view
 def DeviceSyncView(request):
     """Set the KOReader sync password and show connection details for KOReader
     (kosync) and Moon+ Reader (WebDAV).
@@ -727,6 +766,7 @@ def GenresView(request):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+@personal_view
 def BSAddView(request):
     book = request.GET.get('book')
     if book:
@@ -749,6 +789,7 @@ def BSAddView(request):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+@personal_view
 def BSDelView(request):
     book = request.GET.get('book') or request.POST.get('book')
     if book:
@@ -769,6 +810,7 @@ def BSDelView(request):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+@personal_view
 def BSSetPos(request, book_id):
     pos = request.GET.get('pos') if request.GET else None
 
@@ -787,6 +829,7 @@ def BSSetPos(request, book_id):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+@personal_view
 def BSGetPos(request, book_id):
     shelf = bookshelf.objects.filter(user=request.user, book_id=book_id).first()
     response = HttpResponse()
@@ -796,12 +839,14 @@ def BSGetPos(request, book_id):
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
+@personal_view
 def BSClearView(request):
     bookshelf.objects.filter(user=request.user).delete()
     return redirect("%s?searchtype=u" % reverse("web:searchbooks"))
 
 
 @sopds_login(url='web:login')
+@personal_view
 def BSSetStatus(request, book_id):
     status = request.POST.get('status', '')
     valid = {c[0] for c in bookshelf.STATUS_CHOICES}
@@ -814,6 +859,7 @@ def BSSetStatus(request, book_id):
 
 
 @sopds_login(url='web:login')
+@personal_view
 def BSSetRating(request, book_id):
     try:
         rating = int(request.POST.get('rating'))
