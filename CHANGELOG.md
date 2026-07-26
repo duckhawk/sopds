@@ -5,6 +5,34 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-07-26
+
+First release of the Lectern fork. Everything below has accumulated since
+**v0.49** (September 2022): the rebrand and UI rewrite, the move to Django 5.2,
+a long run of scanner and parser hardening, several security fixes, and the
+reading, sync and metadata features added on top.
+
+Versions are three-part from here on. The `v0.50` tag in this repository
+belongs to the unrelated `sarutobi/sopds-ng` fork, which is why our own
+sequence continues at `v0.50.0` rather than reusing that name.
+
+### Upgrading
+
+Run `python manage.py migrate` — this release adds migrations `0011`–`0023`
+in `opds_catalog`, and the whole of the new `sopds_sync` app (`0001`, `0002`).
+Two of them (`0016`, `0020`) build indexes over `opds_catalog_book` and hold a
+write lock on it for the duration, so pick a scan-free window on a large
+catalogue.
+
+Optional, once migrated:
+
+- `python manage.py sopds_isbn_backfill` — fill `isbn` for books already in
+  the catalogue (a normal incremental scan skips them).
+- `python manage.py sopds_enrich` — fill empty annotations, dates and
+  publishers from Open Library, for books that have an ISBN.
+- `python manage.py sopds_kosync_index` — build the KOReader digest index for
+  the existing catalogue. Only needed once; scans keep it current afterwards.
+
 ### Added
 - **Download and read statistics, and a "Most popular" listing.** Nothing
   recorded what the library was actually used for, so the one entry point still
