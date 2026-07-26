@@ -162,6 +162,14 @@ class bookshelf(models.Model):
 
     class Meta:
         unique_together = ['user', 'book']
+        indexes = [
+            # "which books has anyone rated" drives the Top rated listing and
+            # its counter. Rating first so the IS NOT NULL filter is the leading
+            # column, book second so the distinct set can be read straight off
+            # the index without touching the table.
+            models.Index(fields=['rating', 'book'], name='bookshelf_rating_book'),
+        ]
+
 
 class CounterManager(models.Manager):
     def update(self, counter_name, counter_value):

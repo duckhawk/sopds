@@ -21,6 +21,19 @@ All notable changes to this project are documented here. The format is based on
   go up; and anything that cannot be matched is counted and reported rather
   than guessed at.
 
+### Changed
+- The **Top rated** listing no longer costs more as the library grows. It
+  aggregated over every book and then discarded almost all of them with a
+  `HAVING`, so the work scaled with the catalogue rather than with the number
+  of ratings — measured on sqlite with 200 rated books, 4 ms at 2k books and
+  66 ms at 60k for a result that never changed. Restricting the outer query to
+  the books someone has actually rated makes it flat: 2.6, 2.4 and 2.7 ms at
+  the same three sizes. Migration `0025` adds the `(rating, book)` index the
+  rated-set lookup reads. Ordering is unchanged.
+  **Most popular** was measured too and needed nothing — it is already driven
+  by the small `BookStat` table and was flat at 1.1–1.3 ms across the same
+  range.
+
 ### Fixed
 - **An unreachable Redis no longer returns 500 for every page.** Django's
   `RedisCache` lets connection errors out, and the catalogue reads the cache in

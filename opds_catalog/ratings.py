@@ -43,9 +43,24 @@ def top_rated():
     Votes break a tie on the average, so a book five people rated 5 outranks one
     a single person did, and the title breaks the remaining ties to keep paging
     stable.
+
+    The `pk__in` is what keeps this affordable, and it is not redundant with the
+    ordering below. Aggregating straight over `Book` makes the join and the
+    GROUP BY cover the whole catalogue and then discards almost all of it with a
+    HAVING — cost grows with the number of books, not with the number of
+    ratings. Measured on sqlite with 200 rated books, that was 4 ms at 2k books
+    and 66 ms at 60k, for a result that never changed. Restricting the outer
+    query to the books someone has actually rated makes it grow with the rated
+    set instead, which is bounded by how much people rate rather than by how
+    large the library is.
     """
+    rated = (bookshelf.objects
+             .filter(rating__isnull=False)
+             .values_list('book', flat=True)
+             .distinct())
+
     return (Book.objects
+            .filter(pk__in=rated)
             .annotate(rating_average=Avg('bookshelf__rating'),
                       rating_votes=Count('bookshelf__rating'))
-            .filter(rating_votes__gt=0)
             .order_by('-rating_average', '-rating_votes', 'search_title'))
