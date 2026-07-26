@@ -503,6 +503,14 @@ msgstr[1] "%(n)s раза"
 msgstr[2] "%(n)s раз"
 msgstr[3] "%(n)s раз"
 
+#: templates/sopds_books.html:30
+msgid "Show:"
+msgstr "Показать:"
+
+#: templates/sopds_books.html:31
+msgid "All"
+msgstr "Все"
+
 #: views.py:146 views.py:152
 msgid "Search by title"
 msgstr "Поиск по наименованию"
