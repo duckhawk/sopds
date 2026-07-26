@@ -85,6 +85,15 @@ All notable changes to this project are documented here. The format is based on
 - Tooling config in `pyproject.toml` (ruff, mypy); `CONTRIBUTING.md`.
 
 ### Changed
+- The EPUB reader no longer re-does its work on every request. Rendering a book
+  means unzipping it and parsing, sanitising and serialising every document in
+  its spine — a few hundred kilobytes of HTML — and the page then asked for each
+  illustration separately, **each of which re-read the entire archive** through
+  `getFileData`. A chapter with twenty pictures therefore read a 5 MB book
+  twenty-one times. The render and the images are now cached on the same content
+  validator the covers use, both routes answer `If-None-Match` with a 304, and a
+  book that *is* the archive is opened from disk instead of being slurped into
+  memory first, so only the members actually wanted get decompressed.
 - Covers and thumbnails answer conditional GETs. `/opds/cover/<id>/` and
   `/opds/thumb/<id>/` now send an `ETag` derived from the containing file's
   size and mtime — one `stat()`, no unzipping — so a reader revalidating with
