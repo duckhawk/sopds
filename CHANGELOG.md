@@ -36,6 +36,11 @@ All notable changes to this project are documented here. The format is based on
   toggle, settings, device sync, bookshelf add/delete/clear, reading position,
   status, rating) answer **403** instead of raising, since with authentication
   off there is no user to own that data.
+- The **Read** link was rendered for every book, but the in-browser reader is
+  an FB2-to-XHTML transform: clicking it on an EPUB, MOBI, PDF or DjVu fed a
+  binary container to the XML parser and returned **500**. Both reader views
+  now raise `Http404` for anything but FB2 (matching the guard `ConvertFB2`
+  already had), and the book list only offers the link where it works.
 - **Security:** the OIDC client secret and Telegram API token are entered
   through a masked password field in the constance admin instead of being
   shown in clear text.

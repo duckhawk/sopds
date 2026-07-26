@@ -1036,6 +1036,13 @@ def LogoutView(request):
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 def BookReaderView(request, book_id):
+    # The page is only a shell: it fetches opds:read, which can render FB2 and
+    # nothing else. Refuse here as well, so an unreadable format fails as a 404
+    # on the link instead of loading a reader that stays permanently empty.
+    book = get_object_or_404(Book, id=book_id)
+    if book.format != 'fb2':
+        raise Http404
+
     prefs = user_prefs(request.user)
     args = {}
     args['current'] = 'reader'
