@@ -2,6 +2,7 @@
 import os
 import codecs
 import base64
+import hashlib
 import io
 import shlex
 import subprocess
@@ -9,9 +10,11 @@ import lxml.etree as ET
 from re import search
 import logging
 
+from django.core.cache import cache
 from django.http import HttpResponse, Http404
 from django.shortcuts import get_object_or_404
-from django.views.decorators.cache import cache_page
+from django.utils.cache import patch_cache_control
+from django.views.decorators.http import etag
 
 from opds_catalog.models import Book, bookshelf
 from opds_catalog import settings, utils, opdsdb, fb2parse
@@ -34,6 +37,82 @@ logger = logging.getLogger(__name__)
 # tiny-but-huge-dimension image raises DecompressionBombError instead of
 # allocating gigabytes (real covers are far below this).
 Image.MAX_IMAGE_PIXELS = 64_000_000
+
+
+def container_path(book):
+    """Absolute path of the file that physically holds the book.
+
+    That is the book file itself for a plain catalog entry, and the containing
+    zip for an archived one (for INPX entries the .inpx/.inp parts of the stored
+    path are not real directories and have to be stripped first).
+    """
+    full_path = os.path.join(config.SOPDS_ROOT_LIB, book.path)
+    if book.cat_type == opdsdb.CAT_INP:
+        # Убираем из пути INPX и INP файл
+        inp_path, zip_name = os.path.split(full_path)
+        inpx_path, inp_name = os.path.split(inp_path)
+        path, inpx_name = os.path.split(inpx_path)
+        full_path = os.path.join(path, zip_name)
+
+    if book.cat_type == opdsdb.CAT_NORMAL:
+        return os.path.join(full_path, book.filename)
+
+    return full_path
+
+
+def compute_cover_etag(book_id, thumbnail=False):
+    """Validator for the cover/thumbnail views, computed without opening the book.
+
+    Extracting a cover means unzipping and parsing the book, so the point of the
+    ETag is to answer a revalidation with 304 *before* any of that happens. The
+    validator therefore uses only what a single `stat()` gives us: the size and
+    mtime of the containing file, plus the entry that identifies the book inside
+    it. The scanner keys books on (filename, path) and never refreshes the row
+    when a file is replaced in place, so `Book.filesize` cannot be trusted here —
+    the on-disk mtime can.
+
+    Returns None (no ETag, no conditional handling, no caching) when the book or
+    its file is gone; those paths end in a 404 or the no-cover placeholder.
+    """
+    try:
+        book = Book.objects.only('path', 'filename', 'cat_type').get(id=book_id)
+        st = os.stat(container_path(book))
+    except (Book.DoesNotExist, OSError):
+        return None
+
+    key = '%s|%s|%s|%s|%s' % (
+        book_id, book.filename, st.st_size, st.st_mtime_ns,
+        settings.THUMB_SIZE if thumbnail else 'full',
+    )
+    return '"%s"' % hashlib.sha256(key.encode('utf-8')).hexdigest()[:32]
+
+
+def cover_etag(request, book_id, thumbnail=False):
+    """`compute_cover_etag`, memoised for the duration of one request.
+
+    The validator is needed twice per request — once by the `etag` decorator to
+    answer conditional GETs, once by the view as its cache key — and each call
+    costs a query plus a stat. Caching it on the request keeps that at one.
+    """
+    memo = (book_id, bool(thumbnail))
+    if request is not None and getattr(request, '_cover_etag_for', None) == memo:
+        return request._cover_etag
+
+    value = compute_cover_etag(book_id, thumbnail)
+    if request is not None:
+        request._cover_etag_for = memo
+        request._cover_etag = value
+
+    return value
+
+
+def nocover_response():
+    """The placeholder image served when a book has no extractable cover."""
+    if not os.path.exists(config.SOPDS_NOCOVER_PATH):
+        raise Http404
+
+    with open(config.SOPDS_NOCOVER_PATH, 'rb') as f:
+        return HttpResponse(f.read(), content_type='image/jpeg')
 
 
 def getFileName(book):
@@ -251,25 +330,20 @@ def Download(request, book_id, zip_flag):
     return response
 
 
-# Новая версия (0.42) процедуры извлечения обложек из файлов книг fb2, epub, mobi
-@cache_page(config.SOPDS_CACHE_TIME)
-def Cover(request, book_id, thumbnail=False):
-    """ Загрузка обложки """
-    book = get_object_or_404(Book, id=book_id)
-    response = HttpResponse()
-    full_path = os.path.join(config.SOPDS_ROOT_LIB, book.path)
-    if book.cat_type == opdsdb.CAT_INP:
-        # Убираем из пути INPX и INP файл
-        inp_path, zip_name = os.path.split(full_path)
-        inpx_path, inp_name = os.path.split(inp_path)
-        path, inpx_name = os.path.split(inpx_path)
-        full_path = os.path.join(path,zip_name)
+def extract_cover(book, thumbnail=False):
+    """Cover bytes for one book, or None when it has none we can read.
 
+    This is the expensive part — it opens (and for an archived book, unzips) the
+    file and runs a format parser over it — which is why both the ETag and the
+    cache above it exist to avoid reaching here.
+    """
+    full_path = container_path(book)
+
+    image = None
     try:
         if book.cat_type == opdsdb.CAT_NORMAL:
-            file_path = os.path.join(full_path, book.filename)
-            fo = codecs.open(file_path, "rb")
-            book_data = create_bookfile(fo,book.filename)
+            fo = codecs.open(full_path, "rb")
+            book_data = create_bookfile(fo, book.filename)
             image = book_data.extract_cover_memory()
             #fb2.parse(fo, 0)
             fo.close()
@@ -284,35 +358,58 @@ def Cover(request, book_id, thumbnail=False):
             z.close()
             fz.close()
     except Exception:
-        book_data = None
-        image = None
+        return None
+
+    if image and thumbnail:
+        try:
+            # Cover bytes are attacker-controlled; a decompression-bomb
+            # image raises DecompressionBombError (Image.MAX_IMAGE_PIXELS)
+            # instead of allocating huge memory. Fall back to no-cover.
+            thumb = Image.open(io.BytesIO(image)).convert('RGB')
+            thumb.thumbnail((settings.THUMB_SIZE, settings.THUMB_SIZE), Image.LANCZOS)
+            tfile = io.BytesIO()
+            thumb.save(tfile, 'JPEG')
+            image = tfile.getvalue()
+        except Exception:
+            logger.warning('Thumbnail generation failed for book %s', book.id)
+            return None
+
+    return image or None
+
+
+# Новая версия (0.42) процедуры извлечения обложек из файлов книг fb2, epub, mobi
+#
+# Three layers guard the extraction, cheapest first: the `etag` decorator answers
+# a reader's revalidation with 304 without running the view at all; the shared
+# cache below returns the bytes without touching the file; only a real miss pays
+# for unzipping and parsing the book.
+#
+# The cache is keyed on the ETag, not on the URL as `cache_page` was: the
+# validator tracks the file's mtime, so replacing a book in place now yields a
+# new key instead of serving the previous cover until the TTL ran out.
+@etag(cover_etag)
+def Cover(request, book_id, thumbnail=False):
+    """ Загрузка обложки """
+    validator = cover_etag(request, book_id, thumbnail)
+    cache_key = 'sopds-cover:%s' % validator.strip('"') if validator else None
+
+    image = cache.get(cache_key) if cache_key else None
+    if image is None:
+        book = get_object_or_404(Book, id=book_id)
+        # b'' is the "this book has no cover" marker: caching it too keeps a
+        # coverless book from being re-parsed on every page view.
+        image = extract_cover(book, thumbnail) or b''
+        if cache_key:
+            cache.set(cache_key, image, config.SOPDS_CACHE_TIME)
 
     if image:
-        response["Content-Type"] = 'image/jpeg'
-        if thumbnail:
-            try:
-                # Cover bytes are attacker-controlled; a decompression-bomb
-                # image raises DecompressionBombError (Image.MAX_IMAGE_PIXELS)
-                # instead of allocating huge memory. Fall back to no-cover.
-                thumb = Image.open(io.BytesIO(image)).convert('RGB')
-                thumb.thumbnail((settings.THUMB_SIZE, settings.THUMB_SIZE), Image.LANCZOS)
-                tfile = io.BytesIO()
-                thumb.save(tfile, 'JPEG')
-                image = tfile.getvalue()
-            except Exception:
-                logger.warning('Thumbnail generation failed for book %s', book_id)
-                image = None
-        if image:
-            response.write(image)
+        response = HttpResponse(image, content_type='image/jpeg')
+    else:
+        response = nocover_response()
 
-    if not image:
-        if os.path.exists(config.SOPDS_NOCOVER_PATH):
-            response["Content-Type"] = 'image/jpeg'
-            f = open(config.SOPDS_NOCOVER_PATH, "rb")
-            response.write(f.read())
-            f.close()
-        else:
-            raise Http404
+    # Covers carry no per-user content and are served without authentication, so
+    # a shared proxy may cache them too.
+    patch_cache_control(response, public=True, max_age=config.SOPDS_CACHE_TIME)
 
     return response
 
@@ -379,6 +476,17 @@ def Cover0(request, book_id, thumbnail = False):
 
 def Thumbnail(request, book_id):
     return Cover(request, book_id, True)
+
+
+def NoCover(request):
+    """Book-less placeholder cover, for templates that need a default image.
+
+    The `covertmpl` route used to point straight at `Cover`, which takes a
+    mandatory book_id — requesting it raised TypeError and returned 500.
+    """
+    response = nocover_response()
+    patch_cache_control(response, public=True, max_age=config.SOPDS_CACHE_TIME)
+    return response
 
 
 def ConvertFB2(request, book_id, convert_type):
