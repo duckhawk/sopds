@@ -13,7 +13,7 @@ from django.db import connection
 from django.conf import settings as main_settings
 
 from opds_catalog import opdsdb
-from opds_catalog.models import Counter
+from opds_catalog.models import Counter, ScanRun
 from opds_catalog.sopdscan import opdsScanner
 
 # Fixed key for the scan's PostgreSQL session-level advisory lock. Arbitrary but
@@ -147,8 +147,8 @@ class Command(BaseCommand):
             return
 
         self.scan_is_active = True
+        scanner = opdsScanner(self.logger)
         try:
-            scanner=opdsScanner(self.logger)
             # scan_all() commits per directory (and keeps the delete-sweep
             # atomic on its own), so it is not wrapped in one giant transaction.
             scanner.scan_all()
@@ -168,6 +168,12 @@ class Command(BaseCommand):
             # the visibility map, so post-scan reads keep their Index-Only Scans
             # instead of slowing to tens of seconds until autovacuum catches up.
             opdsdb.vacuum_analyze()
+        except Exception as err:
+            # A scan that dies used to leave nothing behind but a stack trace in
+            # a log file and a catalogue that silently stopped growing. Record
+            # the failure against the run, then let it propagate as before.
+            scanner.finish_report(ScanRun.FAILED, error='%s: %s' % (type(err).__name__, err))
+            raise
         finally:
             self.scan_is_active = False
             release_lock()

@@ -227,6 +227,49 @@ class BookStat(models.Model):
         return 'book %s: %d downloads, %d reads' % (self.book_id, self.downloads, self.reads)
 
 
+class ScanRun(models.Model):
+    """What one library scan did.
+
+    The scanner counted all of this already and then only wrote it to a log
+    file, so the outcome of a scan was invisible to the application: how long
+    it took, how much it added, how many files it could not parse — and, worst,
+    whether it finished at all. A run that dies leaves a row saying so instead
+    of simply never updating anything.
+    """
+    RUNNING = 'running'
+    OK = 'ok'
+    FAILED = 'failed'
+    STATUS_CHOICES = [(RUNNING, 'Running'), (OK, 'Finished'), (FAILED, 'Failed')]
+
+    started = models.DateTimeField(default=timezone.now, db_index=True)
+    finished = models.DateTimeField(null=True, default=None)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=RUNNING,
+                              db_index=True)
+
+    books_added = models.IntegerField(default=0)
+    books_deleted = models.IntegerField(default=0)
+    books_skipped = models.IntegerField(default=0)
+    bad_books = models.IntegerField(default=0)
+    books_in_archives = models.IntegerField(default=0)
+    arch_scanned = models.IntegerField(default=0)
+    arch_skipped = models.IntegerField(default=0)
+    bad_archives = models.IntegerField(default=0)
+
+    error = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-started']
+
+    @property
+    def duration_seconds(self):
+        if not self.finished:
+            return None
+        return (self.finished - self.started).total_seconds()
+
+    def __str__(self):
+        return 'scan %s %s' % (self.started.isoformat(), self.status)
+
+
 class ScanSeen(models.Model):
     """Scratch list of book ids seen during the current library scan.
 
