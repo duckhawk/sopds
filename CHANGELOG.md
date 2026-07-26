@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **A rate limit on the routes that hand out book content** — downloads,
+  conversions, covers, thumbnails, the reader and its illustrations
+  (`SOPDS_RATE_LIMIT`, 600 requests per minute per reader, 0 disables). Only
+  the login form was throttled, which mattered less when every content route
+  was a file read and matters more now that one of them unzips a book and
+  parses every document in its spine. This is not access control — the reader
+  is already authenticated by then — it is a ceiling so a runaway sync loop or
+  a mirroring script degrades itself rather than the server. A signed-in
+  reader is counted as themselves rather than as their address, since a
+  household behind one NAT is several readers; the counter lives in the shared
+  cache so the limit is one limit across workers; the check runs before the
+  ETag and the cache, so a client over its budget cannot spend anything; and a
+  cache outage lifts the limit rather than refusing the library.
+  Browsing the feeds is not throttled — it is handing out content that costs.
 - **Scans are recorded.** The scanner counted books added, removed, skipped and
   unparseable, then wrote the numbers to a log file and forgot them, so the
   outcome of a scan was invisible to the application — including whether it
