@@ -34,6 +34,21 @@ All notable changes to this project are documented here. The format is based on
   rather than a miss, so an outage leaves those books queued for the next run.
   `--dry-run`, `--limit`, `--batch-size` and `--sleep` (default 1s between
   calls) as usual. Russian translations included.
+- **kosync progress now names a catalogue book.** The protocol identifies a
+  book only by a hash KOReader computes on the device, so the two halves of
+  the app each tracked reading progress without knowing about the other: read
+  a chapter on the e-reader and the web UI had no idea. `sopds_kosync_index`
+  precomputes the hashes our own files produce — the partial content md5 and
+  the file-name md5, for both names an OPDS download can arrive under — and
+  incoming progress is matched against them. A recognised book gets its
+  `KosyncProgress.book` set, and the user's shelf entry picks up the
+  percentage and moves to *reading* / *read*; the book list shows how far the
+  e-reader has got. Progress only ever moves forward, so a second device
+  syncing a stale position cannot undo the first. An unrecognised hash still
+  syncs exactly as before — kosync remains a key-value store first — and a
+  failure on the shelf side can never fail the sync itself. Migrations
+  `opds_catalog/0020` and `sopds_sync/0002`. Run the indexer after a scan.
+  Russian translations included.
 - htmx live-search suggestions in the header search box (title/author/series),
   as progressive enhancement.
 - Title suggestions now show the book's first author next to the title, so
