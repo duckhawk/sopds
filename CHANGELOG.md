@@ -22,6 +22,20 @@ All notable changes to this project are documented here. The format is based on
   than guessed at.
 
 ### Added
+- **Send a book to a reading device by mail.** The classic missing path: an
+  e-reader without an OPDS client — a Kindle most obviously — can only be
+  filled by mailing files to its address, so the only way out of this catalogue
+  was a browser download and a cable. A reader sets a device address on the
+  settings page and gets a *Send to device* button on the book card. Migration
+  `0026`. Nothing about it is Kindle-specific; it mails the book to whatever
+  address was configured.
+  The button appears only when both a server and an address exist, since an
+  offer that cannot work is worse than none. Oversized books are refused up
+  front with the size and the limit, rather than vanishing in a relay. An SMTP
+  failure is logged in full and reported to the reader as a generic failure —
+  the detail can name the relay and the credentials it rejected. The endpoint
+  is POST-only, so no link can trigger a send, and it counts against the
+  content rate limit: sending mail on demand is the most abusable thing here.
 - **Self-service accounts.** A password could only be changed, and an account
   only created, through the Django admin — fine for one administrator and
   constant friction for everyone else, since a reader who forgot their password

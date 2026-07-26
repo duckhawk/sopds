@@ -137,6 +137,11 @@ class Theme(models.Model):
     theme_css = models.CharField(max_length=64, default='css/sopds.css')
     reader_mode = models.CharField(max_length=16, choices=READER_MODE_CHOICES, default=READER_WHOLE)
     font_size = models.PositiveSmallIntegerField(default=100)  # percent, 70..200
+    # Where "send to device" mails a book: a Kindle's @kindle.com address, or
+    # any other address that accepts documents. Kept on the preferences row
+    # rather than on User, because it is a per-reader setting like the rest of
+    # this and has nothing to do with the account's own address.
+    device_email = models.EmailField(max_length=254, blank=True, default='')
 
 
 class bookshelf(models.Model):
