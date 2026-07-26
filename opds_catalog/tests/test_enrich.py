@@ -11,7 +11,8 @@ from django.core.management import call_command
 from django.utils import timezone
 
 from opds_catalog import openlibrary
-from opds_catalog.models import Book, Catalog
+from opds_catalog import opdsdb
+from opds_catalog.models import Author, Book, Catalog
 
 ISBN = '9780306406157'
 OTHER = '9783161484100'
@@ -289,3 +290,110 @@ def test_a_book_already_enriched_by_hand_is_left_alone(catalogue, fake_api):
 
     call_command('sopds_enrich', '--sleep', '0')
     assert fake_api['asked'] == []
+
+
+# --- authors ---------------------------------------------------------------
+
+@pytest.mark.django_db
+def test_a_book_with_no_author_gets_one(catalogue, fake_api):
+    book = catalogue('Anonymous book', isbn=ISBN)
+    fake_api['answer'] = {ISBN: {'authors': ['Ellis Peters']}}
+
+    call_command('sopds_enrich', '--sleep', '0')
+
+    assert [a.full_name for a in book.authors.all()] == ['Ellis Peters']
+
+
+@pytest.mark.django_db
+def test_several_authors_are_all_attached(catalogue, fake_api):
+    book = catalogue('Collaboration', isbn=ISBN)
+    fake_api['answer'] = {ISBN: {'authors': ['Arkady Strugatsky', 'Boris Strugatsky']}}
+
+    call_command('sopds_enrich', '--sleep', '0')
+
+    assert sorted(a.full_name for a in book.authors.all()) == \
+        ['Arkady Strugatsky', 'Boris Strugatsky']
+
+
+@pytest.mark.django_db
+def test_an_existing_author_is_never_replaced(catalogue, fake_api):
+    """The parser read that name out of the file, and one ISBN can cover
+    editions credited differently. Not even --force overrides it."""
+    book = catalogue('Credited book', isbn=ISBN)
+    book.authors.add(opdsdb.addauthor('Real Author'))
+    fake_api['answer'] = {ISBN: {'authors': ['Someone Else']}}
+
+    call_command('sopds_enrich', '--force', '--sleep', '0')
+
+    assert [a.full_name for a in book.authors.all()] == ['Real Author']
+
+
+@pytest.mark.django_db
+def test_an_author_row_is_reused_not_duplicated(catalogue, fake_api):
+    first = catalogue('One', isbn=ISBN)
+    second = catalogue('Two', isbn=OTHER)
+    fake_api['answer'] = {ISBN: {'authors': ['Ellis Peters']},
+                          OTHER: {'authors': ['Ellis Peters']}}
+
+    call_command('sopds_enrich', '--sleep', '0')
+
+    assert Author.objects.filter(full_name='Ellis Peters').count() == 1
+    assert first.authors.first() == second.authors.first()
+
+
+@pytest.mark.django_db
+def test_the_author_gets_its_search_name_filled(catalogue, fake_api):
+    """Otherwise the new author is invisible to the author search."""
+    catalogue('Anonymous book', isbn=ISBN)
+    fake_api['answer'] = {ISBN: {'authors': ['Ellis Peters']}}
+
+    call_command('sopds_enrich', '--sleep', '0')
+
+    author = Author.objects.get(full_name='Ellis Peters')
+    assert author.search_full_name == 'ELLIS PETERS'
+
+
+@pytest.mark.django_db
+def test_a_book_needing_only_authors_is_still_a_candidate(catalogue, fake_api):
+    """It has every scalar field filled, so the old query skipped it."""
+    catalogue('Complete but anonymous', isbn=ISBN,
+              annotation='a', docdate='1982', publisher='Gollancz')
+    fake_api['answer'] = {ISBN: {'authors': ['Ellis Peters']}}
+
+    call_command('sopds_enrich', '--sleep', '0')
+
+    assert fake_api['asked'] == [ISBN]
+    assert Author.objects.filter(full_name='Ellis Peters').exists()
+
+
+@pytest.mark.django_db
+def test_dry_run_attaches_nobody(catalogue, fake_api):
+    book = catalogue('Anonymous book', isbn=ISBN)
+    fake_api['answer'] = {ISBN: {'authors': ['Ellis Peters']}}
+
+    call_command('sopds_enrich', '--dry-run', '--sleep', '0')
+
+    assert not book.authors.exists()
+    assert not Author.objects.exists()
+
+
+@pytest.mark.django_db
+def test_an_absurd_author_list_is_capped(catalogue, fake_api):
+    book = catalogue('Anthology', isbn=ISBN)
+    fake_api['answer'] = {ISBN: {'authors': ['Author %d' % n for n in range(50)]}}
+
+    call_command('sopds_enrich', '--sleep', '0')
+
+    assert book.authors.count() == 10
+
+
+def test_parse_details_reads_author_names():
+    fields = openlibrary.parse_details(
+        {'authors': [{'name': 'Ellis Peters', 'key': '/authors/OL1A'}]})
+    assert fields['authors'] == ['Ellis Peters']
+
+
+def test_parse_details_ignores_malformed_author_entries():
+    fields = openlibrary.parse_details(
+        {'authors': [{'key': '/authors/OL1A'}, None, 'plain string', {'name': '  '}]})
+    assert 'authors' not in fields
