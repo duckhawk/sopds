@@ -67,6 +67,9 @@ if SENTRY_DSN:
 # commented out) — pure overhead — so it is removed. Performance-sensitive shared
 # fragments are cached explicitly instead (see sopds_web_backend.views).
 MIDDLEWARE = [
+    # First, so every later middleware and every log line emitted while handling
+    # the request can see the id — including responses the rest never reaches.
+    'sopds.request_id.RequestIDMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -232,6 +235,42 @@ else:
             'LOCATION': 'sopds-locmem',
         }
     }
+
+# Logging: tag every line with the request it belongs to. Several uwsgi workers
+# interleave their output and an e-reader polling feeds produces a lot of it, so
+# without the tag a report of "a download failed a few minutes ago" has to be
+# matched against the log by guesswork.
+#
+# Only the loggers that emit during a request are redirected here, each with
+# propagate=False so they are not also printed by whatever is attached to the
+# root logger — the scanner attaches a file handler there at runtime, and a line
+# arriving twice is worse than a line arriving plainly.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'request_id': {'()': 'sopds.request_id.RequestIDFilter'},
+    },
+    'formatters': {
+        'tagged': {
+            'format': '%(asctime)s %(levelname)-8s [%(request_id)s] %(name)s: %(message)s',
+        },
+    },
+    'handlers': {
+        'tagged_console': {
+            'class': 'logging.StreamHandler',
+            'filters': ['request_id'],
+            'formatter': 'tagged',
+        },
+    },
+    'loggers': {
+        'django.request': {'handlers': ['tagged_console'], 'level': 'WARNING', 'propagate': False},
+        'opds_catalog': {'handlers': ['tagged_console'], 'level': 'INFO', 'propagate': False},
+        'sopds_sync': {'handlers': ['tagged_console'], 'level': 'INFO', 'propagate': False},
+        'sopds.metrics': {'handlers': ['tagged_console'], 'level': 'INFO', 'propagate': False},
+        'sopds_web_backend': {'handlers': ['tagged_console'], 'level': 'INFO', 'propagate': False},
+    },
+}
 
 CACHE_MIDDLEWARE_KEY_PREFIX = "sopds"
 

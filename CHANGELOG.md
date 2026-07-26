@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **A correlation id on every request.** Several uwsgi workers interleave their
+  output and an e-reader polling feeds produces a great deal of it, so a report
+  of "a download failed a few minutes ago" had to be matched against the log by
+  guesswork. Each request now carries an id: taken from `X-Request-ID` when
+  something upstream already set one, so an ingress that stamps requests keeps
+  the same value end to end, generated otherwise; returned in the response
+  header; tagged onto the Sentry scope; and printed on every log line emitted
+  while handling the request. An inbound value is length-limited and stripped
+  of anything unusual before it is used — it is attacker-supplied and ends up
+  in log records, where a newline turns one record into two.
 - **A rate limit on the routes that hand out book content** — downloads,
   conversions, covers, thumbnails, the reader and its illustrations
   (`SOPDS_RATE_LIMIT`, 600 requests per minute per reader, 0 disables). Only
