@@ -22,6 +22,18 @@ All notable changes to this project are documented here. The format is based on
   than guessed at.
 
 ### Added
+- **OPDS 2.0 (JSON) feeds**, under `/opds/2.0/`, alongside the Atom ones rather
+  than instead of them: every e-reader still speaks 1.2, and the newer clients
+  — Thorium, Foliate, recent Aldiko — prefer or require 2.0. A navigation root,
+  *Recently added*, *Top rated*, *Most popular*, all books, and a templated
+  search link, each driven by the same querysets the Atom feeds and the web
+  listings use, so the two formats cannot disagree about what is in the
+  catalogue. The Atom root advertises the JSON one as an `alternate`, so a
+  client that prefers JSON can find it without being told.
+  The format was matched against the official test catalogue at
+  `test.opds.io/2.0/home.json` rather than the specification prose, since the
+  published draft currently 404s and a live reference implementation is the
+  better thing to agree with.
 - **Send a book to a reading device by mail.** The classic missing path: an
   e-reader without an OPDS client — a Kindle most obviously — can only be
   filled by mailing files to its address, so the only way out of this catalogue

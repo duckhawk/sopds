@@ -1,6 +1,6 @@
 
 from django.urls import re_path
-from opds_catalog import feeds, dl
+from opds_catalog import feeds, dl, opds2_views
 
 app_name='opds_catalog'
 
@@ -63,6 +63,15 @@ urlpatterns = [
     # Images referenced from a rendered EPUB. The path is matched loosely and
     # validated against the archive's own name list in the view.
     re_path(r'^read/(?P<book_id>[0-9]+)/res/(?P<path>.+)$', dl.ReadResource, name='readres'),
+
+    # OPDS 2.0 (JSON), alongside the Atom feeds rather than instead of them:
+    # every e-reader still speaks 1.2, and the newer clients prefer this.
+    re_path(r'^2.0/$', opds2_views.root, name='opds2_root'),
+    re_path(r'^2.0/new/$', opds2_views.new_books, name='opds2_new'),
+    re_path(r'^2.0/rated/$', opds2_views.top_rated, name='opds2_rated'),
+    re_path(r'^2.0/popular/$', opds2_views.popular, name='opds2_popular'),
+    re_path(r'^2.0/books/$', opds2_views.all_books, name='opds2_books'),
+    re_path(r'^2.0/search/$', opds2_views.search, name='opds2_search'),
 
     re_path(r'^$',feeds.MainFeed(), name='main'),
 ]

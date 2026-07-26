@@ -56,6 +56,33 @@ MAX_CACHED_RESOURCE_BYTES = 1024 * 1024
 MAX_CACHED_RENDER_BYTES = 4 * 1024 * 1024
 
 
+def authenticate_catalog(request):
+    """Resolve the caller against SOPDS_AUTH, or return a 401 to send back.
+
+    Returns None when the request may proceed. Shared by the content routes and
+    by the OPDS 2.0 feeds, which authenticate the same way but are not throttled
+    — listing is cheap, handing out content is what costs.
+    """
+    if config.SOPDS_AUTH and not request.user.is_authenticated:
+        # Returns the request (with .user set) on success, a 401 otherwise.
+        result = BasicAuthMiddleware().process_request(request)
+        if result is not None and not hasattr(result, 'user'):
+            return result
+    return None
+
+
+def require_login(view):
+    """Authenticate, without the rate limit. For browsing, not for content."""
+    @wraps(view)
+    def _wrapped(request, *args, **kwargs):
+        refused = authenticate_catalog(request)
+        if refused is not None:
+            return refused
+        return view(request, *args, **kwargs)
+
+    return _wrapped
+
+
 def require_catalog_access(view):
     """Guard the routes that hand out book content: who may ask, and how often.
 
@@ -68,11 +95,9 @@ def require_catalog_access(view):
     """
     @wraps(view)
     def _wrapped(request, *args, **kwargs):
-        if config.SOPDS_AUTH and not request.user.is_authenticated:
-            # Returns the request (with .user set) on success, a 401 otherwise.
-            result = BasicAuthMiddleware().process_request(request)
-            if result is not None and not hasattr(result, 'user'):
-                return result
+        refused = authenticate_catalog(request)
+        if refused is not None:
+            return refused
 
         # After authentication, so a signed-in reader is counted as themselves
         # rather than as their address, and before the ETag and the cache, so a
