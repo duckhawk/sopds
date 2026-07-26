@@ -21,7 +21,7 @@ from django.utils.cache import patch_cache_control
 from django.views.decorators.http import etag
 
 from opds_catalog.models import Book, bookshelf
-from opds_catalog import settings, utils, opdsdb, epub_render, stats
+from opds_catalog import settings, utils, opdsdb, epub_render, stats, throttle
 import zipfile
 from opds_catalog.ziptools import open_zipfile
 
@@ -57,7 +57,7 @@ MAX_CACHED_RENDER_BYTES = 4 * 1024 * 1024
 
 
 def require_catalog_access(view):
-    """Refuse anonymous access to catalogue content while SOPDS_AUTH is on.
+    """Guard the routes that hand out book content: who may ask, and how often.
 
     Factored out of `Download`, which had the only copy of this. A session login
     counts, and so does OPDS Basic auth: e-readers fetch cover art with the same
@@ -73,6 +73,13 @@ def require_catalog_access(view):
             result = BasicAuthMiddleware().process_request(request)
             if result is not None and not hasattr(result, 'user'):
                 return result
+
+        # After authentication, so a signed-in reader is counted as themselves
+        # rather than as their address, and before the ETag and the cache, so a
+        # client over its limit cannot spend anything either.
+        if throttle.over_limit(request):
+            return throttle.too_many(request)
+
         return view(request, *args, **kwargs)
 
     return _wrapped
