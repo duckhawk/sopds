@@ -29,6 +29,9 @@ def library(db, tmp_path):
     # one test rewrites it.
     shutil.copy(os.path.join(DATA, FB2), tmp_path / FB2)
     config.SOPDS_ROOT_LIB = str(tmp_path)
+    # This module is about caching, not access control; the cover routes answer
+    # 401 before any of it when SOPDS_AUTH is on (see test_content_auth.py).
+    config.SOPDS_AUTH = False
     cat = Catalog.objects.create(parent=None, cat_name='.', path='.', cat_type=0)
     return Book.objects.create(
         filename=FB2, path='.', filesize=os.path.getsize(tmp_path / FB2),
