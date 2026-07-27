@@ -95,6 +95,21 @@ body {
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+
+  /* The page is at least as tall as the window, and the content between the
+     nav and the footer takes up whatever is left over — so on a short page
+     (the login form, an empty search) the footer sits on the bottom edge
+     instead of halfway up with nothing under it. */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A mobile browser's viewport grows as the address bar retracts; 100vh is the
+   larger of the two and leaves the page scrollable by that much. dvh follows
+   the real height. */
+@supports (min-height: 100dvh) {
+  body { min-height: 100dvh; }
 }
 
 a { color: var(--link); text-decoration: none; }
@@ -637,9 +652,12 @@ dialog.reveal::backdrop { background: rgba(15, 20, 15, .45); }
 /* --------------------------------------------------------------------------
    14. Content wrapper + footer
    -------------------------------------------------------------------------- */
-.content-wrap { max-width: var(--maxw); margin: 0 auto; padding: 1.25rem 0 2rem; }
+/* `width: 100%` because body is a flex column: an item with auto margins on the
+   cross axis is not stretched, so without it the wrapper would shrink to its
+   contents instead of filling the column up to --maxw. */
+.content-wrap { max-width: var(--maxw); width: 100%; margin: 0 auto; padding: 1.25rem 0 2rem; flex: 1 0 auto; }
 
-.lx-footer { background: var(--surface-2); border-top: 1px solid var(--border); margin-top: 2rem; }
+.lx-footer { background: var(--surface-2); border-top: 1px solid var(--border); margin-top: 2rem; flex-shrink: 0; }
 .lx-footer .footer-grid { max-width: var(--maxw); margin: 0 auto; padding: 1.5rem var(--gutter) .5rem; }
 .lx-footer h5 { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
 .lx-footer .menu { list-style: none; display: flex; margin: 0; padding: 0; }
