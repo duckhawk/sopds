@@ -624,8 +624,11 @@ msgid "Genres"
 msgstr "Жанры"
 
 #: templates/sopds_nav.html:122
+# The placeholder is this plus the name of the field being searched, and
+# Russian would need that name in the dative ("по названию", not "по
+# название"). A colon takes the nominative the label already carries.
 msgid "Search by"
-msgstr "Искать по"
+msgstr "Поиск:"
 
 #: templates/sopds_password_change_done.html:3
 #, fuzzy

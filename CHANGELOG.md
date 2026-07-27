@@ -18,13 +18,27 @@ All notable changes to this project are documented here. The format is based on
   annotation emits a literal target and drops the path, which would send a
   reader asking for `/opds/search/...` to the front page, and keeping the path
   needs a configuration snippet — disabled by default in current versions.
+- **A language switcher in the header**, off by default
+  (`SOPDS_LANGUAGE_SWITCHER`). The interface language has always been one
+  setting for the whole site, which is right for a private library and wrong
+  for a public one where readers do not share a first language. With it on,
+  each session picks its own and the site setting becomes the default for
+  whoever has not chosen. POST rather than a link, so a browser prefetching a
+  GET cannot flip a reader's language for them.
+  The page's `lang` attribute now says which language it is actually in — it
+  was hardcoded to `ru` — and the language is part of the cached page-fragment
+  key, without which switching would serve whichever rendering happened to be
+  cached first.
 - **`sopds_util ensureuser <name> <password> [--superuser]`** — idempotent
   account creation, for bootstrapping the first administrator or the fixed
   account a public demo signs visitors in with. Django's `createsuperuser`
   fails when the account exists, which makes it useless from a deployment that
   runs on every rollout.
-- **`SOPDS_LOGIN_NOTICE`** — a line of the administrator's own above the login
-  form: who to ask for an account, or the credentials of a public demo.
+- **`SOPDS_LOGIN_NOTICE_EN` / `SOPDS_LOGIN_NOTICE_RU`** — a line of the
+  administrator's own above the login form: who to ask for an account, or the
+  credentials of a public demo. One per language, because with the switcher on
+  the same visitor can read the page in either; whichever is filled in is used
+  when the other is not.
 - **Documentation at `/docs`**, in Russian and English, linked from the nav and
   the footer and readable without signing in — the page about connecting an
   e-reader is exactly what someone who cannot get in yet needs.
@@ -41,6 +55,10 @@ All notable changes to this project are documented here. The format is based on
   New dependency: `Markdown`.
 
 ### Fixed
+- The search box no longer asks to "Искать по title". The placeholder was
+  built from the radio button's id, which is English whatever the interface
+  language is; it now uses the label, and the Russian wording was changed to
+  one that takes the nominative the label carries.
 - The footer no longer hangs in mid-air on a short page. On the login form, an
   empty search or the welcome page it sat wherever the content happened to end,
   with the page background below it to the bottom of the window. The page is now
