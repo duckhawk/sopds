@@ -24,8 +24,8 @@
 
  <button class="alert button small" type="button" onclick="document.getElementById('ConfirmModal').showModal()">{% trans "Clear bookshelf" %}</button>
 
- {# Reading status is set by hand and by an e-reader syncing progress, so the
-    shelf is worth narrowing by it. #}
+ {% comment %} Reading status is set by hand and by an e-reader syncing progress, so the
+    shelf is worth narrowing by it. {% endcomment %}
  <span class="lx-shelf-filter" style="margin-left:.6rem;font-size:85%;">
    <b>{% trans "Show:" %}</b>
    <a href="{% url "web:searchbooks" %}?searchtype=u"><span class="{% if not shelf_status %}label{% else %}secondary label{% endif %} small">{% trans "All" %}</span></a>
@@ -120,8 +120,8 @@
 				   <b>{% trans "Taken:" %}</b> <span class="label small">{% blocktrans count n=b.stat.downloads %}{{ n }} download{% plural %}{{ n }} downloads{% endblocktrans %}</span><br>
 				{% endif %}
 				{% if b.percent %}
-				   {# Reported by an e-reader over kosync; stored as a 0..1 fraction,
-				      and widthratio is the only stock way to scale it to percent. #}
+				   {% comment %} Reported by an e-reader over kosync; stored as a 0..1 fraction,
+				      and widthratio is the only stock way to scale it to percent. {% endcomment %}
 				   <b>{% trans "Progress:" %}</b> <span class="label small">{% widthratio b.percent 1 100 %}%</span><br>
 				{% endif %}
 				{% if sopds_auth %}
