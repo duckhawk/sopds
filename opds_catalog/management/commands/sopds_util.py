@@ -12,9 +12,10 @@ class Command(BaseCommand):
     verbose = False
         
     def add_arguments(self, parser):
-        parser.add_argument('command', action="store", nargs='*', help='Use [ clear | info | save_mygenres | load_mygenres | setconf | getconf | pg_optimize ]')
+        parser.add_argument('command', action="store", nargs='*', help='Use [ clear | info | save_mygenres | load_mygenres | setconf | getconf | pg_optimize | ensureuser ]')
         parser.add_argument('--verbose',action='store_true', dest='verbose', default=False, help='Set verbosity level for books collection scan.')  
-        parser.add_argument('--nogenres',action='store_true', dest='nogenres', default=False, help='Not install genres fom fixtures.')              
+        parser.add_argument('--nogenres',action='store_true', dest='nogenres', default=False, help='Not install genres fom fixtures.')
+        parser.add_argument('--superuser',action='store_true', dest='superuser', default=False, help='For ensureuser: give the account administrator rights.')
 
     def handle(self, *args, **options):
         action = options['command'][0] 
@@ -40,6 +41,8 @@ class Command(BaseCommand):
             self.getconf(self.confparam)
         elif action == "pg_optimize":
             self.pg_optimize()
+        elif action == "ensureuser":
+            self.ensureuser(options['command'][1:], options['superuser'])
 
     def clear(self):
         with transaction.atomic():
@@ -81,6 +84,37 @@ class Command(BaseCommand):
 
     def pg_optimize(self):
         opdsdb.pg_optimize(True)
+
+    def ensureuser(self, args, superuser=False):
+        """`ensureuser <username> <password> [--superuser]` — make it so, once.
+
+        Django's own createsuperuser fails if the account already exists, which
+        makes it useless from a deployment that runs on every rollout. This one
+        is idempotent: it creates the account or resets its password to the one
+        given, and says which it did.
+
+        Written for bootstrapping — the first administrator of a fresh
+        installation, or the fixed account a public demo signs visitors in with.
+        Passing a password on a command line leaves it in the process list, so
+        for anything that is not a demo, prefer creating the account once and
+        changing the password from the web interface.
+        """
+        from django.contrib.auth import get_user_model
+
+        if len(args) < 2:
+            self.stderr.write('Usage: sopds_util ensureuser <username> <password> [--superuser]')
+            return
+
+        username, password = args[0], args[1]
+        User = get_user_model()
+        user, created = User.objects.get_or_create(username=username)
+        user.set_password(password)
+        if superuser:
+            user.is_staff = True
+            user.is_superuser = True
+        user.save()
+
+        self.stdout.write('User %s %s.' % (username, 'created' if created else 'password reset'))
 
 
             

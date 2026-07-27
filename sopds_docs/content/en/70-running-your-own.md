@@ -43,7 +43,28 @@ Optional, all configured in the admin:
 `SOPDS_AUTH` decides whether the catalogue needs a login at all;
 `SOPDS_ALLOW_REGISTRATION` whether visitors can create their own accounts.
 Filling in the `SOPDS_SMTP_*` settings enables password resets and sending books
-to a device. `SOPDS_OIDC_*` puts a Keycloak button on the login page.
+to a device. `SOPDS_OIDC_*` puts a Keycloak button on the login page, and
+`SOPDS_LOGIN_NOTICE` puts a line of your own above the login form — who to ask
+for an account, or what a public demo should be logged into with.
+
+The first account has to come from somewhere:
+
+    python3 manage.py sopds_util ensureuser <name> <password> --superuser
+
+Unlike Django's `createsuperuser` this is idempotent — it creates the account or
+resets its password — so a deployment can run it on every rollout. It takes the
+password on the command line, where the process list can see it, so for anything
+that is not a demo create the account once and change the password from the web
+interface.
+
+## Renaming the site
+
+An OPDS catalogue saved on an e-reader, a bookmark, a KOReader sync
+configuration: none of them can be edited from here, and all of them break when
+the hostname changes. So keep the old name in `ALLOWED_HOSTS` and set the
+environment variable `CANONICAL_HOST` to the new one. Every request that arrives
+at any other name is then answered with a permanent redirect, path and query
+intact, and the saved catalogues keep working.
 
 ## Backups
 

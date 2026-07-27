@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`CANONICAL_HOST`** — renaming a site without breaking what is already saved
+  on people's readers. An OPDS catalogue entry inside KOReader, a bookmark, a
+  sync configuration: none can be edited from the server, and all break when the
+  hostname changes. Keep the old name in `ALLOWED_HOSTS`, set `CANONICAL_HOST`
+  to the new one, and every request that arrives elsewhere is answered with a
+  301 — path and query intact. Empty by default, so an installation that has
+  only ever had one name is untouched. Health and metrics endpoints are exempt,
+  because a probe reads a redirect as a failure.
+  Deliberately not the ingress's job: nginx-ingress's `permanent-redirect`
+  annotation emits a literal target and drops the path, which would send a
+  reader asking for `/opds/search/...` to the front page, and keeping the path
+  needs a configuration snippet — disabled by default in current versions.
+- **`sopds_util ensureuser <name> <password> [--superuser]`** — idempotent
+  account creation, for bootstrapping the first administrator or the fixed
+  account a public demo signs visitors in with. Django's `createsuperuser`
+  fails when the account exists, which makes it useless from a deployment that
+  runs on every rollout.
+- **`SOPDS_LOGIN_NOTICE`** — a line of the administrator's own above the login
+  form: who to ask for an account, or the credentials of a public demo.
 - **Documentation at `/docs`**, in Russian and English, linked from the nav and
   the footer and readable without signing in — the page about connecting an
   e-reader is exactly what someone who cannot get in yet needs.
