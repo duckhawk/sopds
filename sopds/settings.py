@@ -36,6 +36,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # backward compatibility. Restrict via ALLOWED_HOSTS env in production.
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
+# The one name this site answers to. When set, a request that arrived at any
+# other allowed host is answered with a permanent redirect here — which is how
+# a site can be renamed without breaking the OPDS catalogues, bookmarks and
+# sync configurations already saved on people's readers. Empty (the default)
+# leaves every host serving the site directly. See sopds/canonical.py.
+CANONICAL_HOST = os.getenv('CANONICAL_HOST', '').strip()
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.auth',    
@@ -72,6 +79,9 @@ MIDDLEWARE = [
     # the request can see the id — including responses the rest never reaches.
     'sopds.request_id.RequestIDMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    # Before anything that touches the session or the database: a request for a
+    # superseded hostname is answered with a redirect and nothing else.
+    'sopds.canonical.CanonicalHostMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -367,6 +377,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_TAGS_EDITABLE', (True, _('Let signed-in readers add and remove tags. Turn off if registration is open to strangers.'))),
 
     ('SOPDS_ALLOW_REGISTRATION', (False, _('Let visitors create their own account on the login page'))),
+    ('SOPDS_LOGIN_NOTICE', ('', _('Text shown above the login form — who to ask for an account, or the credentials of a public demo'))),
 
     ('SOPDS_SMTP_HOST', ('', _('SMTP server for password resets and sending books to a device (empty = mail disabled)'))),
     ('SOPDS_SMTP_PORT', (587, _('SMTP port'))),
@@ -398,7 +409,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     '7. Log & PID Files': ('SOPDS_SERVER_LOG', 'SOPDS_SCANNER_LOG', 'SOPDS_TELEBOT_LOG','SOPDS_SERVER_PID','SOPDS_SCANNER_PID','SOPDS_TELEBOT_PID'),
     '8. OIDC (Keycloak)': ('SOPDS_OIDC_ENABLE', 'SOPDS_OIDC_ISSUER', 'SOPDS_OIDC_CLIENT_ID', 'SOPDS_OIDC_CLIENT_SECRET', 'SOPDS_OIDC_SCOPES', 'SOPDS_OIDC_BUTTON_TEXT'),
     '9. Reading Progress Sync': ('SOPDS_KOSYNC_ENABLE', 'SOPDS_KOSYNC_ALLOW_REGISTER', 'SOPDS_WEBDAV_ENABLE', 'SOPDS_WEBDAV_ROOT'),
-    '10. Accounts & Mail': ('SOPDS_TAGS_EDITABLE', 'SOPDS_ALLOW_REGISTRATION', 'SOPDS_SMTP_HOST', 'SOPDS_SMTP_PORT', 'SOPDS_SMTP_USER', 'SOPDS_SMTP_PASSWORD', 'SOPDS_SMTP_TLS', 'SOPDS_SMTP_SSL', 'SOPDS_MAIL_FROM'),
+    '10. Accounts & Mail': ('SOPDS_TAGS_EDITABLE', 'SOPDS_ALLOW_REGISTRATION', 'SOPDS_LOGIN_NOTICE', 'SOPDS_SMTP_HOST', 'SOPDS_SMTP_PORT', 'SOPDS_SMTP_USER', 'SOPDS_SMTP_PASSWORD', 'SOPDS_SMTP_TLS', 'SOPDS_SMTP_SSL', 'SOPDS_MAIL_FROM'),
     '11. Monitoring': ('SOPDS_RATE_LIMIT', 'SOPDS_METRICS_ENABLE', 'SOPDS_METRICS_TOKEN'),
 }
 

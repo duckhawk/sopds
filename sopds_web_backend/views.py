@@ -115,6 +115,7 @@ def sopds_processor(request):
     # Offering a password reset that cannot be sent is worse than not offering it.
     args['mail_configured'] = mail.is_configured()
     args['oidc_button_text'] = config.SOPDS_OIDC_BUTTON_TEXT
+    args['login_notice'] = config.SOPDS_LOGIN_NOTICE
     args['sopds_version'] = settings.VERSION
     args['alphabet'] = config.SOPDS_ALPHABET_MENU
     args['splititems'] = config.SOPDS_SPLITITEMS
