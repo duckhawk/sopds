@@ -3,8 +3,8 @@
 
 {% block ext-body %}
 {% if login_notice %}
-{# Whatever the administrator needs a visitor to read before they try to log
-   in: who to ask for an account, or the credentials of a public demo. #}
+{% comment %} Whatever the administrator needs a visitor to read before they try to log
+   in: who to ask for an account, or the credentials of a public demo. {% endcomment %}
 <div class="row">
 <div class="small-12 medium-8 large-6 small-centered columns">
   <div class="callout">{{ login_notice }}</div>
