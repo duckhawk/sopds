@@ -16,6 +16,8 @@ django-picklefield
 six
 Authlib
 requests
+# The /docs views import it to render the pages, so the suite needs it too.
+Markdown
 
 pytest==9.1.1
 pytest-django==4.12.0
