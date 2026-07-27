@@ -4,10 +4,24 @@
 {% block ext-body %}
 <div class="row">
 <div class="small-12 medium-8 large-8 small-centered columns">
-<h3 style="text-align:center;">{% trans "Hello" %} {% if user.is_authenticated %}{{ user.username }}{% endif %}{% if not user.is_authenticated %}{% trans "Guest" %}{% endif %} !</h3>
+
+<h3 style="text-align:center;">{% trans "Hello" %} {% if user.is_authenticated %}{{ user.username }}{% else %}{% trans "Guest" %}{% endif %} !</h3>
+
 <p style="text-align:justify;">
-   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Lectern is a self-hosted OPDS catalog for your e-book library — a fork of the Simple OPDS (SOPDS) project. OPDS (Open Publication Distribution System) lets you access your collection over the network from e-readers, tablets, smartphones and other devices. More about the parent project can be found on its website:" %} <a href="http://www.sopds.ru/"> www.sopds.ru</a>.
+  {% blocktrans %}This is <b>Lectern</b>, a catalogue for a library of e-books. Search it or browse it here, read a book in the browser without downloading anything, or point an e-reader at it over OPDS and take the whole collection with you.{% endblocktrans %}
 </p>
+
+<ul>
+  <li>{% blocktrans %}<b>Read here.</b> FB2 and EPUB reflow to fit the screen; PDF and DjVu scans open page by page. Where you stopped is remembered.{% endblocktrans %}</li>
+  <li>{% blocktrans %}<b>Read on a device.</b> Any OPDS client can browse, search and download from this catalogue, and KOReader and Moon+ Reader can sync how far through a book you are.{% endblocktrans %}</li>
+  <li>{% blocktrans %}<b>Keep track.</b> A shelf of what you have opened, a status and a rating for each book, tags everyone shares and lists that are yours alone.{% endblocktrans %}</li>
+</ul>
+
+{% url 'docs:index' as docs_url %}
+<p style="text-align:justify;">
+  {% blocktrans %}The <a href="{{ docs_url }}">documentation</a> covers connecting a reader, syncing your reading progress and everything else. Lectern is free software — a fork of SOPDS that has grown a fair distance from it — and the source is on <a href="https://github.com/duckhawk/lectern">GitHub</a>.{% endblocktrans %}
+</p>
+
 </div>
 </div>
-{% endblock %}  {# body #}
+{% endblock %}  {# ext-body #}

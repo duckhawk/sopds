@@ -28,6 +28,7 @@ urlpatterns = [
     re_path(r'^metrics/?$', health.metrics_view),
     re_path(r'^opds/', include('opds_catalog.urls', namespace='opds')),
     re_path(r'^web/', include('sopds_web_backend.urls', namespace='web')),
+    re_path(r'^docs/', include('sopds_docs.urls', namespace='docs')),
     re_path(r'^kosync/', include('sopds_sync.kosync_urls', namespace='kosync')),
     re_path(r'^dav/', include('sopds_sync.webdav_urls', namespace='webdav')),
     re_path(r'^admin/', admin.site.urls),

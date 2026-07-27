@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-25 16:11+0300\n"
+"POT-Creation-Date: 2026-07-27 06:06+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -24,27 +24,27 @@ msgstr ""
 msgid "Chapter"
 msgstr "Глава"
 
-#: templates/PagedReader.html:30
+#: templates/PagedReader.html:29
 msgid "Zoom out"
 msgstr "Уменьшить"
 
-#: templates/PagedReader.html:31
+#: templates/PagedReader.html:30
 msgid "Fit the width"
 msgstr "По ширине"
 
-#: templates/PagedReader.html:32
+#: templates/PagedReader.html:31
 msgid "Zoom in"
 msgstr "Увеличить"
 
-#: templates/PagedReader.html:34
+#: templates/PagedReader.html:33
 msgid "Page"
 msgstr "Страница"
 
-#: templates/PagedReader.html:37
+#: templates/PagedReader.html:36
 msgid "Opening the book…"
 msgstr "Открываем книгу…"
 
-#: templates/PagedReader.html:56
+#: templates/PagedReader.html:54
 msgid "This book could not be opened."
 msgstr "Не удалось открыть эту книгу."
 
@@ -60,7 +60,9 @@ msgstr "Просмотр сайта"
 msgid "Documentation"
 msgstr "Документация"
 
-#: templates/admin/base.html:44
+#: templates/admin/base.html:44 templates/sopds_password_change.html:3
+#: templates/sopds_password_change.html:4 templates/sopds_settings.html:44
+#: views.py:1403
 msgid "Change password"
 msgstr "Смена пароля"
 
@@ -72,17 +74,22 @@ msgstr "Выход"
 msgid "Home"
 msgstr "Главная"
 
+#: templates/sopds_account_form.html:25 templates/sopds_devicesync.html:29
+#: templates/sopds_settings.html:41
+msgid "Save"
+msgstr "Сохранить"
+
 #: templates/sopds_authors.html:8
 #, python-format
 msgid "Total: %(a_book_count)s books."
 msgstr "Всего: %(a_book_count)s книг."
 
-#: templates/sopds_authors.html:17 templates/sopds_books.html:110
+#: templates/sopds_authors.html:17 templates/sopds_books.html:161
 #: templates/sopds_catalogs.html:42 templates/sopds_series.html:17
 msgid "Previous page"
 msgstr "Назад"
 
-#: templates/sopds_authors.html:32 templates/sopds_books.html:125
+#: templates/sopds_authors.html:32 templates/sopds_books.html:176
 #: templates/sopds_catalogs.html:57 templates/sopds_series.html:32
 msgid "Next page"
 msgstr "Вперед"
@@ -103,97 +110,218 @@ msgstr "Отмена"
 msgid "Clear bookshelf"
 msgstr "Очистить книжную полку"
 
+#: templates/sopds_books.html:30
+msgid "Show:"
+msgstr "Показать:"
+
 #: templates/sopds_books.html:31
-msgid "Download:"
-msgstr "Скачать:"
+msgid "All"
+msgstr "Все"
 
-#: templates/sopds_books.html:42
-msgid "Read"
-msgstr "Читать"
-
-#: templates/sopds_books.html:47
-msgid "Delete this book from your bookshelf?"
-msgstr "Удалить эту книгу с книжной полки?"
-
-#: templates/sopds_books.html:48
-msgid "Delete from bookshelf"
-msgstr "Удалить с книжной полки"
-
-#: templates/sopds_books.html:50
-msgid "Add to bookshelf"
-msgstr "Добавить на книжную полку"
-
-#: templates/sopds_books.html:60
-msgid "Book title:"
-msgstr "Название книги:"
-
-#: templates/sopds_books.html:62
-msgid "Authors:"
-msgstr "Авторы:"
-
-#: templates/sopds_books.html:65
-msgid "Genres:"
-msgstr "Жанры:"
-
-#: templates/sopds_books.html:68
-msgid "Series:"
-msgstr "Серии:"
-
-#: templates/sopds_books.html:69
-msgid "No in Series:"
-msgstr "No в серии:"
-
-#: templates/sopds_books.html:71
-msgid "File:"
-msgstr "Файл:"
-
-#: templates/sopds_books.html:72
-msgid "File size:"
-msgstr "Размер файла:"
-
-#: templates/sopds_books.html:73
-msgid "Changes date:"
-msgstr "Дата правки:"
-
-#: templates/sopds_books.html:75
-msgid "Doubles for book:"
-msgstr "Дубликаты книги:"
-
-#: templates/sopds_books.html:78
-msgid "Read date:"
-msgstr "Дата прочтения:"
-
-#: templates/sopds_books.html:82
-msgid "Status:"
-msgstr "Статус:"
-
-#: templates/sopds_books.html:85
+#: templates/sopds_books.html:32 templates/sopds_books.html:132
 msgid "To read"
 msgstr "Буду читать"
 
-#: templates/sopds_books.html:86
+#: templates/sopds_books.html:33 templates/sopds_books.html:133
 msgid "Reading"
 msgstr "Читаю"
 
-#: templates/sopds_books.html:87
+#: templates/sopds_books.html:34 templates/sopds_books.html:134
 msgid "Finished"
 msgstr "Прочитано"
 
+#: templates/sopds_books.html:41
+msgid "Download:"
+msgstr "Скачать:"
+
+#: templates/sopds_books.html:54
+msgid "Read"
+msgstr "Читать"
+
+#: templates/sopds_books.html:57 templates/sopds_settings.html:30
+msgid "Send to device"
+msgstr "Отправить на устройство"
+
+#: templates/sopds_books.html:63
+msgid "Delete this book from your bookshelf?"
+msgstr "Удалить эту книгу с книжной полки?"
+
+#: templates/sopds_books.html:64
+msgid "Delete from bookshelf"
+msgstr "Удалить с книжной полки"
+
+#: templates/sopds_books.html:66
+msgid "Add to bookshelf"
+msgstr "Добавить на книжную полку"
+
+#: templates/sopds_books.html:76
+msgid "Book title:"
+msgstr "Название книги:"
+
+#: templates/sopds_books.html:78
+msgid "Authors:"
+msgstr "Авторы:"
+
+#: templates/sopds_books.html:81
+msgid "Genres:"
+msgstr "Жанры:"
+
+#: templates/sopds_books.html:84
+msgid "Series:"
+msgstr "Серии:"
+
+#: templates/sopds_books.html:85
+msgid "No in Series:"
+msgstr "No в серии:"
+
 #: templates/sopds_books.html:89
+msgid "ISBN:"
+msgstr "ISBN:"
+
+#: templates/sopds_books.html:92
+msgid "Publisher:"
+msgstr "Издательство:"
+
+#: templates/sopds_books.html:94
+msgid "File:"
+msgstr "Файл:"
+
+#: templates/sopds_books.html:95
+msgid "File size:"
+msgstr "Размер файла:"
+
+#: templates/sopds_books.html:96
+msgid "Changes date:"
+msgstr "Дата правки:"
+
+#: templates/sopds_books.html:98
+msgid "Doubles for book:"
+msgstr "Дубликаты книги:"
+
+#: templates/sopds_books.html:101
+msgid "Read date:"
+msgstr "Дата прочтения:"
+
+#: templates/sopds_books.html:104
+msgid "Lists:"
+msgstr "Списки:"
+
+#: templates/sopds_books.html:106
+msgid "Add to a list…"
+msgstr "Добавить в список…"
+
+#: templates/sopds_books.html:113
+msgid "Tags:"
+msgstr "Теги:"
+
+#: templates/sopds_books.html:115 templates/sopds_devicesync.html:31
+msgid "Remove"
+msgstr "Удалить"
+
+#: templates/sopds_books.html:120
+msgid "Taken:"
+msgstr "Брали:"
+
+#: templates/sopds_books.html:120
+#, python-format
+msgid "%(n)s download"
+msgid_plural "%(n)s downloads"
+msgstr[0] "%(n)s раз"
+msgstr[1] "%(n)s раза"
+msgstr[2] "%(n)s раз"
+msgstr[3] "%(n)s раз"
+
+#: templates/sopds_books.html:125
+msgid "Progress:"
+msgstr "Прогресс:"
+
+#: templates/sopds_books.html:129
+msgid "Status:"
+msgstr "Статус:"
+
+#: templates/sopds_books.html:136
 msgid "Rating:"
 msgstr "Оценка:"
+
+#: templates/sopds_books.html:139
+#, python-format
+msgid "%(votes)s rating"
+msgid_plural "%(votes)s ratings"
+msgstr[0] "%(votes)s оценка"
+msgstr[1] "%(votes)s оценки"
+msgstr[2] "%(votes)s оценок"
+msgstr[3] "%(votes)s оценок"
+
+#: templates/sopds_books.html:237 views.py:289
+msgid "Tag"
+msgstr "Тег"
+
+#: templates/sopds_books.html:241 views.py:1107
+msgid "That tag could not be added."
+msgstr "Не удалось добавить тег."
+
+#: templates/sopds_books.html:257
+msgid "Sent to"
+msgstr "Отправлено на"
+
+#: templates/sopds_books.html:258
+msgid "Could not send the book."
+msgstr "Не удалось отправить книгу."
 
 #: templates/sopds_breadcrumbs.html:3
 msgid "You are here:"
 msgstr "Вы здесь:"
 
-#: templates/sopds_devicesync.html:6 templates/sopds_nav.html:28 views.py:427
+#: templates/sopds_collections.html:10
+msgid "Name a new list"
+msgstr "Название нового списка"
+
+#: templates/sopds_collections.html:12
+msgid "Create"
+msgstr "Создать"
+
+#: templates/sopds_collections.html:26
+#, python-format
+msgid "shared by %(who)s"
+msgstr "общий, от %(who)s"
+
+#: templates/sopds_collections.html:28
+msgid "shared"
+msgstr "общий"
+
+#: templates/sopds_collections.html:34
+msgid "Unshare"
+msgstr "Сделать личным"
+
+#: templates/sopds_collections.html:34
+msgid "Share"
+msgstr "Поделиться"
+
+#: templates/sopds_collections.html:36
+msgid "Delete"
+msgstr "Удалить список"
+
+#: templates/sopds_collections.html:43
+msgid "No lists yet. Create one above, then add books from their cards."
+msgstr ""
+"Списков пока нет. Создайте первый выше, затем добавляйте книги с карточек."
+
+#: templates/sopds_collections.html:67 views.py:1041
+msgid "That list could not be created."
+msgstr "Не удалось создать список."
+
+#: templates/sopds_collections.html:75
+msgid "Delete this list?"
+msgstr "Удалить этот список?"
+
+#: templates/sopds_devicesync.html:6 templates/sopds_nav.html:28 views.py:570
 msgid "Device sync"
 msgstr "Синхронизация с устройствами"
 
 #: templates/sopds_devicesync.html:7
 msgid "Sync your reading progress between this library and e-reader apps."
-msgstr "Синхронизируйте прогресс чтения между библиотекой и приложениями-читалками."
+msgstr ""
+"Синхронизируйте прогресс чтения между библиотекой и приложениями-читалками."
 
 #: templates/sopds_devicesync.html:13
 msgid "kosync"
@@ -202,7 +330,9 @@ msgstr "kosync"
 #: templates/sopds_devicesync.html:15
 msgid ""
 "In KOReader open <b>Tools → Progress sync → Custom sync server</b> and enter:"
-msgstr "В KOReader откройте <b>Tools → Progress sync → Custom sync server</b> и введите:"
+msgstr ""
+"В KOReader откройте <b>Tools → Progress sync → Custom sync server</b> и "
+"введите:"
 
 #: templates/sopds_devicesync.html:17
 msgid "Server"
@@ -234,14 +364,6 @@ msgstr "Изменить пароль синхронизации"
 msgid "Set sync password"
 msgstr "Задать пароль синхронизации"
 
-#: templates/sopds_devicesync.html:29 templates/sopds_settings.html:28
-msgid "Save"
-msgstr "Сохранить"
-
-#: templates/sopds_devicesync.html:31
-msgid "Remove"
-msgstr "Удалить"
-
 #: templates/sopds_devicesync.html:32
 msgid "A sync password is currently set."
 msgstr "Пароль синхронизации уже задан."
@@ -250,7 +372,8 @@ msgstr "Пароль синхронизации уже задан."
 msgid ""
 "The kosync API is disabled. Ask the administrator to enable "
 "SOPDS_KOSYNC_ENABLE."
-msgstr "API kosync отключён. Попросите администратора включить SOPDS_KOSYNC_ENABLE."
+msgstr ""
+"API kosync отключён. Попросите администратора включить SOPDS_KOSYNC_ENABLE."
 
 #: templates/sopds_devicesync.html:44
 msgid "In Moon+ Reader open <b>Options → Sync → WebDAV</b> and enter:"
@@ -266,13 +389,17 @@ msgstr "ваш обычный пароль входа в SOPDS"
 
 #: templates/sopds_devicesync.html:50
 msgid "WebDAV uses your normal SOPDS account — no separate password needed."
-msgstr "WebDAV использует вашу обычную учётную запись SOPDS — отдельный пароль не нужен."
+msgstr ""
+"WebDAV использует вашу обычную учётную запись SOPDS — отдельный пароль не "
+"нужен."
 
 #: templates/sopds_devicesync.html:52
 msgid ""
 "The WebDAV endpoint is disabled. Ask the administrator to enable "
 "SOPDS_WEBDAV_ENABLE."
-msgstr "Endpoint WebDAV отключён. Попросите администратора включить SOPDS_WEBDAV_ENABLE."
+msgstr ""
+"Endpoint WebDAV отключён. Попросите администратора включить "
+"SOPDS_WEBDAV_ENABLE."
 
 #: templates/sopds_footer.html:10
 msgid "BOOKSHELF"
@@ -322,28 +449,68 @@ msgstr "Никогда"
 msgid "RANDOM BOOK"
 msgstr "СЛУЧАЙНАЯ КНИГА"
 
-#: templates/sopds_hello.html:7
+#: templates/sopds_footer.html:57 templates/sopds_nav.html:82
+msgid "Help"
+msgstr "Справка"
+
+#: templates/sopds_hello.html:8
 msgid "Hello"
 msgstr "Здравствуйте"
 
-#: templates/sopds_hello.html:7
+#: templates/sopds_hello.html:8
 msgid "Guest"
 msgstr "Гость"
 
-#: templates/sopds_hello.html:9
+#: templates/sopds_hello.html:11
 msgid ""
-"Lectern is a self-hosted OPDS catalog for your e-book library — a fork of "
-"the Simple OPDS (SOPDS) project. OPDS (Open Publication Distribution System) "
-"lets you access your collection over the network from e-readers, tablets, "
-"smartphones and other devices. More about the parent project can be found on "
-"its website:"
+"This is <b>Lectern</b>, a catalogue for a library of e-books. Search it or "
+"browse it here, read a book in the browser without downloading anything, or "
+"point an e-reader at it over OPDS and take the whole collection with you."
 msgstr ""
-"Lectern — OPDS-каталог для вашей библиотеки электронных книг, работающий на "
-"вашем собственном сервере. Это ответвление (форк) проекта Simple OPDS "
-"(SOPDS). OPDS (Open Publication Distribution System) позволяет получать "
-"доступ к вашей коллекции по сети с устройств для чтения электронных книг, "
-"планшетов, смартфонов и т.д. Подробнее о родительском проекте вы сможете "
-"найти на его Web-сайте:"
+"Это <b>Lectern</b> — каталог библиотеки электронных книг. Ищите и листайте "
+"его здесь, читайте книгу прямо в браузере, ничего не скачивая, или "
+"подключите к нему читалку по OPDS и заберите всё собрание с собой."
+
+#: templates/sopds_hello.html:15
+msgid ""
+"<b>Read here.</b> FB2 and EPUB reflow to fit the screen; PDF and DjVu scans "
+"open page by page. Where you stopped is remembered."
+msgstr ""
+"<b>Читать здесь.</b> FB2 и EPUB перетекают по ширине экрана, сканы в PDF и "
+"DjVu открываются страница за страницей. Место, где вы остановились, "
+"запоминается."
+
+#: templates/sopds_hello.html:16
+msgid ""
+"<b>Read on a device.</b> Any OPDS client can browse, search and download "
+"from this catalogue, and KOReader and Moon+ Reader can sync how far through "
+"a book you are."
+msgstr ""
+"<b>Читать на устройстве.</b> Любой OPDS-клиент умеет листать этот каталог, "
+"искать по нему и скачивать книги, а KOReader и Moon+ Reader — ещё и "
+"синхронизировать, до какого места вы дочитали."
+
+#: templates/sopds_hello.html:17
+msgid ""
+"<b>Keep track.</b> A shelf of what you have opened, a status and a rating "
+"for each book, tags everyone shares and lists that are yours alone."
+msgstr ""
+"<b>Вести учёт.</b> Полка с тем, что вы открывали, статус и оценка у каждой "
+"книги, общие для всех теги и списки, которые принадлежат только вам."
+
+#: templates/sopds_hello.html:22
+#, python-format
+msgid ""
+"The <a href=\"%(docs_url)s\">documentation</a> covers connecting a reader, "
+"syncing your reading progress and everything else. Lectern is free software "
+"— a fork of SOPDS that has grown a fair distance from it — and the source is "
+"on <a href=\"https://github.com/duckhawk/lectern\">GitHub</a>."
+msgstr ""
+"В <a href=\"%(docs_url)s\">документации</a> описано, как подключить "
+"читалку, как синхронизировать прогресс чтения и всё остальное. Lectern — "
+"свободное программное обеспечение, форк SOPDS, ушедший от него довольно "
+"далеко; исходный код лежит на <a "
+"href=\"https://github.com/duckhawk/lectern\">GitHub</a>."
 
 #: templates/sopds_login.html:10
 msgid "Enter Username"
@@ -353,15 +520,24 @@ msgstr "Введите имя"
 msgid "Enter Password"
 msgstr "Введите пароль"
 
-#: templates/sopds_login.html:15
+#: templates/sopds_login.html:15 templates/sopds_password_reset_complete.html:5
 msgid "Log in"
 msgstr "Вход"
+
+#: templates/sopds_login.html:21
+msgid "Forgot your password?"
+msgstr "Забыли пароль?"
+
+#: templates/sopds_login.html:22 templates/sopds_register.html:3
+msgid "Create an account"
+msgstr "Создать учётную запись"
 
 #: templates/sopds_nav.html:22
 msgid "Menu"
 msgstr "Меню"
 
-#: templates/sopds_nav.html:27 templates/sopds_settings.html:6 views.py:389
+#: templates/sopds_nav.html:27 templates/sopds_password_change_done.html:5
+#: templates/sopds_settings.html:6 views.py:529 views.py:1403
 msgid "Settings"
 msgstr "Настройки"
 
@@ -369,16 +545,17 @@ msgstr "Настройки"
 msgid "Admin"
 msgstr "Админка"
 
-#: templates/sopds_nav.html:32 views.py:986
+#: templates/sopds_nav.html:32 views.py:1343
 msgid "Logout"
 msgstr "Выход"
 
-#: templates/sopds_nav.html:34 views.py:898 views.py:905 views.py:947
+#: templates/sopds_nav.html:34 views.py:1255 views.py:1262 views.py:1304
+#: views.py:1438 views.py:1469
 msgid "Login"
 msgstr "Вход"
 
-#: templates/sopds_nav.html:43 templates/sopds_nav.html:51 views.py:487
-#: views.py:537
+#: templates/sopds_nav.html:43 templates/sopds_nav.html:51 views.py:630
+#: views.py:680 views.py:733
 msgid "Search"
 msgstr "Найти"
 
@@ -391,43 +568,161 @@ msgid "Author"
 msgstr "Автор"
 
 #: templates/sopds_nav.html:55 templates/sopds_nav.html:61
-#: templates/sopds_nav.html:81 templates/sopds_nav.html:99 views.py:487
-#: views.py:689
+#: templates/sopds_nav.html:88 templates/sopds_nav.html:106 views.py:630
+#: views.py:886
 msgid "Series"
 msgstr "Серии"
+
+#: templates/sopds_nav.html:55 templates/sopds_nav.html:62
+msgid "Genre"
+msgstr "Жанр"
 
 #: templates/sopds_nav.html:55 templates/sopds_nav.html:59
 msgid "Title"
 msgstr "Название"
 
-#: templates/sopds_nav.html:75 views.py:206
+#: templates/sopds_nav.html:76 views.py:257
 msgid "Recently added"
 msgstr "Недавно добавленные"
 
-#: templates/sopds_nav.html:76 views.py:613
+#: templates/sopds_nav.html:77 views.py:263
+msgid "Top rated"
+msgstr "Лучшие по оценке"
+
+#: templates/sopds_nav.html:78 views.py:295
+msgid "Most popular"
+msgstr "Самые популярные"
+
+#: templates/sopds_nav.html:79 views.py:1135
+msgid "Tags"
+msgstr "Теги"
+
+#: templates/sopds_nav.html:80
+msgid "Lists"
+msgstr "Списки"
+
+#: templates/sopds_nav.html:81 views.py:810
 msgid "Catalogs"
 msgstr "Каталоги"
 
-#: templates/sopds_nav.html:78 templates/sopds_nav.html:84 views.py:146
-#: views.py:152 views.py:165 views.py:178 views.py:187 views.py:190
-#: views.py:199 views.py:203 views.py:215 views.py:228 views.py:230
-#: views.py:639
+#: templates/sopds_nav.html:85 templates/sopds_nav.html:91 views.py:197
+#: views.py:205 views.py:211 views.py:224 views.py:237 views.py:246
+#: views.py:249 views.py:257 views.py:263 views.py:289 views.py:295
+#: views.py:302 views.py:317 views.py:329 views.py:342 views.py:344
+#: views.py:836
 msgid "Books"
 msgstr "Книги"
 
-#: templates/sopds_nav.html:79 templates/sopds_nav.html:91 views.py:537
-#: views.py:664
+#: templates/sopds_nav.html:86 templates/sopds_nav.html:98 views.py:680
+#: views.py:861
 msgid "Authors"
 msgstr "Авторы"
 
-#: templates/sopds_nav.html:80 templates/sopds_nav.html:97 views.py:712
-#: views.py:716
+#: templates/sopds_nav.html:87 templates/sopds_nav.html:104 views.py:733
+#: views.py:909 views.py:913
 msgid "Genres"
 msgstr "Жанры"
 
-#: templates/sopds_nav.html:115
+#: templates/sopds_nav.html:122
 msgid "Search by"
 msgstr "Искать по"
+
+#: templates/sopds_password_change_done.html:3
+#, fuzzy
+#| msgid "Password"
+msgid "Password changed"
+msgstr "Пароль"
+
+#: templates/sopds_password_change_done.html:4
+#, fuzzy
+#| msgid "A sync password is currently set."
+msgid "Your new password is in effect."
+msgstr "Пароль синхронизации уже задан."
+
+#: templates/sopds_password_reset.html:3 views.py:1438
+#, fuzzy
+#| msgid "Set sync password"
+msgid "Reset password"
+msgstr "Задать пароль синхронизации"
+
+#: templates/sopds_password_reset.html:4
+msgid ""
+"Enter the address on your account and we will send you a link to set a new "
+"password."
+msgstr ""
+"Введите адрес, указанный в вашей учётной записи, и мы пришлём ссылку для "
+"установки нового пароля."
+
+#: templates/sopds_password_reset.html:5
+msgid "Send the link"
+msgstr "Прислать ссылку"
+
+#: templates/sopds_password_reset_complete.html:3
+#, fuzzy
+#| msgid "Password"
+msgid "Password set"
+msgstr "Пароль"
+
+#: templates/sopds_password_reset_complete.html:4
+msgid "You can now log in with your new password."
+msgstr "Теперь можно войти с новым паролем."
+
+#: templates/sopds_password_reset_confirm.html:3
+#, fuzzy
+#| msgid "Set sync password"
+msgid "Set a new password"
+msgstr "Задать пароль синхронизации"
+
+#: templates/sopds_password_reset_confirm.html:4
+#, fuzzy
+#| msgid "Set sync password"
+msgid "Set password"
+msgstr "Задать пароль синхронизации"
+
+#: templates/sopds_password_reset_confirm.html:7
+msgid "This link has already been used or has expired. Ask for a new one."
+msgstr "Эта ссылка уже использована или устарела. Запросите новую."
+
+#: templates/sopds_password_reset_done.html:3
+msgid "Check your mail"
+msgstr "Проверьте почту"
+
+#: templates/sopds_password_reset_done.html:7
+msgid ""
+"If that address has an account, a link to set a new password is on its way. "
+"The link expires shortly."
+msgstr ""
+"Если с этим адресом связана учётная запись, ссылка для установки нового "
+"пароля уже отправлена. Она действует недолго."
+
+#: templates/sopds_password_reset_email.txt:1
+#, python-format
+msgid ""
+"Someone asked to reset the password for your account on %(site_name)s.\n"
+"\n"
+"Open this link to set a new one:"
+msgstr ""
+"Кто-то запросил смену пароля для вашей учётной записи на %(site_name)s. "
+"Откройте эту ссылку, чтобы задать новый:"
+
+#: templates/sopds_password_reset_email.txt:7
+msgid ""
+"The link works once and expires shortly. If it was not you, nothing has "
+"changed and you can ignore this message."
+msgstr ""
+"Ссылка срабатывает один раз и действует недолго. Если это были не вы, "
+"ничего не изменилось и письмо можно не читать."
+
+#: templates/sopds_password_reset_subject.txt:1
+#, python-format
+msgid "Set a new password for %(site_name)s"
+msgstr "Новый пароль для %(site_name)s"
+
+#: templates/sopds_register.html:4
+#, fuzzy
+#| msgid "Create an account"
+msgid "Create account"
+msgstr "Создать учётную запись"
 
 #: templates/sopds_selectauthor.html:16
 #, python-format
@@ -439,7 +734,7 @@ msgstr "Всего: %(chars_cnt)s авторов."
 msgid "Total: %(chars_cnt)s books."
 msgstr "Всего: %(chars_cnt)s книг."
 
-#: templates/sopds_selectgenres.html:16
+#: templates/sopds_selectgenres.html:18
 #, python-format
 msgid "Total: %(g_num_book)s books."
 msgstr "Всего: %(g_num_book)s книг."
@@ -482,227 +777,122 @@ msgstr "По главам"
 msgid "Reader font size"
 msgstr "Размер шрифта"
 
-#: templates/sopds_books.html:72 views.py:162
-msgid "ISBN:"
-msgstr "ISBN:"
-
-#: views.py:161
-msgid "Search by ISBN"
-msgstr "Поиск по ISBN"
-#: templates/sopds_books.html:72
-msgid "Publisher:"
-msgstr "Издательство:"
-
-#: templates/sopds_books.html:81
-msgid "Progress:"
-msgstr "Прогресс:"
-
-#: templates/sopds_nav.html:77 views.py:256
-msgid "Top rated"
-msgstr "Лучшие по оценке"
-
-#: templates/sopds_books.html:88
-#, python-format
-msgid "%(votes)s rating"
-msgid_plural "%(votes)s ratings"
-msgstr[0] "%(votes)s оценка"
-msgstr[1] "%(votes)s оценки"
-msgstr[2] "%(votes)s оценок"
-msgstr[3] "%(votes)s оценок"
-
-#: templates/sopds_nav.html:78 views.py:264
-msgid "Most popular"
-msgstr "Самые популярные"
-
-#: templates/sopds_books.html:84
-msgid "Taken:"
-msgstr "Брали:"
-
-#: templates/sopds_books.html:85
-#, python-format
-msgid "%(n)s download"
-msgid_plural "%(n)s downloads"
-msgstr[0] "%(n)s раз"
-msgstr[1] "%(n)s раза"
-msgstr[2] "%(n)s раз"
-msgstr[3] "%(n)s раз"
-
-#: templates/sopds_books.html:30
-msgid "Show:"
-msgstr "Показать:"
-
-#: templates/sopds_books.html:31
-msgid "All"
-msgstr "Все"
-
-#: templates/sopds_nav.html:62
-msgid "Genre"
-msgstr "Жанр"
-
-#: templates/sopds_books.html:56 templates/sopds_settings.html:33
-msgid "Send to device"
-msgstr "Отправить на устройство"
-
-#: templates/sopds_settings.html:35
+#: templates/sopds_settings.html:31
 msgid "Address of your reading device"
 msgstr "Адрес вашей читалки"
 
-#: templates/sopds_books.html:171
-msgid "Sent to"
-msgstr "Отправлено на"
+#: templates/sopds_settings.html:36
+msgid ""
+"Books you send will arrive here. For a Kindle, add this library's sending "
+"address to your approved senders list at Amazon, or the message will be "
+"discarded."
+msgstr ""
+"Отправленные книги придут сюда. Для Kindle добавьте адрес отправителя этой "
+"библиотеки в список одобренных отправителей в настройках Amazon, иначе "
+"письмо будет отброшено."
 
-#: templates/sopds_books.html:172
-msgid "Could not send the book."
-msgstr "Не удалось отправить книгу."
-
-#: templates/sopds_login.html:20
-msgid "Forgot your password?"
-msgstr "Забыли пароль?"
-
-#: templates/sopds_login.html:21 templates/sopds_register.html:3
-msgid "Create an account"
-msgstr "Создать учётную запись"
-
-#: templates/sopds_books.html:100
-msgid "Tags:"
-msgstr "Теги:"
-
-#: templates/sopds_nav.html:79 views.py:930
-msgid "Tags"
-msgstr "Теги"
-
-#: views.py:270
-msgid "Tag"
-msgstr "Тег"
-
-#: templates/sopds_tags.html:16
+#: templates/sopds_tags.html:15
 msgid "No tags yet. Add one from a book's card."
 msgstr "Тегов пока нет. Добавьте первый на карточке книги."
 
-#: views.py:880
-msgid "That tag could not be added."
-msgstr "Не удалось добавить тег."
+#: views.py:92
+msgid "This page requires a signed-in user."
+msgstr "Эта страница доступна только после входа."
 
-#: views.py:876
-msgid "Tag editing is disabled."
-msgstr "Редактирование тегов отключено."
-
-#: templates/sopds_nav.html:80
-msgid "Lists"
-msgstr "Списки"
-
-#: templates/sopds_collections.html:3 views.py:283
-msgid "Collections"
-msgstr "Подборки"
-
-#: templates/sopds_books.html:97
-msgid "Lists:"
-msgstr "Списки:"
-
-#: templates/sopds_books.html:99
-msgid "Add to a list…"
-msgstr "Добавить в список…"
-
-#: templates/sopds_collections.html:10
-msgid "Name a new list"
-msgstr "Название нового списка"
-
-#: templates/sopds_collections.html:12
-msgid "Create"
-msgstr "Создать"
-
-#: templates/sopds_collections.html:27
-msgid "shared"
-msgstr "общий"
-
-#: templates/sopds_collections.html:33
-msgid "Share"
-msgstr "Поделиться"
-
-#: templates/sopds_collections.html:33
-msgid "Unshare"
-msgstr "Сделать личным"
-
-#: templates/sopds_collections.html:35
-msgid "Delete"
-msgstr "Удалить список"
-
-#: templates/sopds_collections.html:42
-msgid "No lists yet. Create one above, then add books from their cards."
-msgstr "Списков пока нет. Создайте первый выше, затем добавляйте книги с карточек."
-
-#: templates/sopds_collections.html:75
-msgid "Delete this list?"
-msgstr "Удалить этот список?"
-
-#: views.py:900
-msgid "That list could not be created."
-msgstr "Не удалось создать список."
-
-#: views.py:146 views.py:152
+#: views.py:197 views.py:211
 msgid "Search by title"
 msgstr "Поиск по наименованию"
 
-#: views.py:165
+#: views.py:205
+msgid "Search by ISBN"
+msgstr "Поиск по ISBN"
+
+#: views.py:224
 msgid "Search by author"
 msgstr "Поиск по автору"
 
-#: views.py:178
+#: views.py:237
 msgid "Search by series"
 msgstr "Поиск по серии"
 
-#: views.py:187 views.py:190
+#: views.py:246 views.py:249
 msgid "Search by genre"
 msgstr "Поиск по жанру"
 
-#: views.py:199 views.py:203
+#: views.py:277 views.py:1026
+msgid "Collections"
+msgstr "Подборки"
+
+#: views.py:302 views.py:317
 msgid "Bookshelf"
 msgstr "Книжная полка"
 
-#: views.py:215
+#: views.py:329
 msgid "Doubles for book"
 msgstr "Дубликаты книги"
 
-#: views.py:413
+#: views.py:556
 msgid "Sync password removed."
 msgstr "Пароль синхронизации удалён."
 
-#: views.py:417
+#: views.py:560
 msgid "Sync password must be at least 6 characters long."
 msgstr "Пароль синхронизации должен быть не короче 6 символов."
 
-#: views.py:423
+#: views.py:566
 msgid "Sync password saved."
 msgstr "Пароль синхронизации сохранён."
 
-#: views.py:610
+#: views.py:807
 msgid "ROOT"
 msgstr "НАЧАЛО"
 
-#: views.py:639 views.py:664 views.py:689 views.py:712 views.py:716
+#: views.py:836 views.py:861 views.py:886 views.py:909 views.py:913
 msgid "Select"
 msgstr "Выбор"
 
-#: views.py:832
+#: views.py:1102 views.py:1118
+msgid "Tag editing is disabled."
+msgstr "Редактирование тегов отключено."
+
+#: views.py:1155
+msgid "Method not allowed"
+msgstr "Метод не разрешён"
+
+#: views.py:1161
+msgid "Too many requests"
+msgstr "Слишком много запросов"
+
+#: views.py:1189
 msgid "HOME"
 msgstr "ГЛАВНАЯ"
 
-#: views.py:899
+#: views.py:1256
 msgid "OIDC authentication failed."
 msgstr "Ошибка аутентификации OIDC."
 
-#: views.py:906
+#: views.py:1263
 msgid "This account cannot sign in via OIDC."
 msgstr "Эта учётная запись не может войти через OIDC."
 
-#: views.py:957
+#: views.py:1314
 msgid "Too many login attempts. Please try again later."
 msgstr "Слишком много попыток входа. Повторите попытку позже."
 
-#: views.py:973
+#: views.py:1330
 msgid "This account is not active!"
 msgstr "Учетная запись не активна!"
 
-#: views.py:977
+#: views.py:1334
 msgid "User does not exist or the password is incorrect!"
 msgstr "Пользователь не существует или введен неправильный пароль!"
+
+#: views.py:1424 views.py:1459
+#, fuzzy
+#| msgid "Too many login attempts. Please try again later."
+msgid "Too many attempts. Please try again later."
+msgstr "Слишком много попыток входа. Повторите попытку позже."
+
+#: views.py:1469
+msgid "Register"
+msgstr "Регистрация"

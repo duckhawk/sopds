@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'opds_catalog',
     'sopds_web_backend',
     'sopds_sync',
+    'sopds_docs',
     'django.contrib.admin',
     'django.contrib.staticfiles',     
     'constance.backends.database',
