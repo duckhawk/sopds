@@ -199,6 +199,28 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1.25rem 0; }
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-1);
 }
+/* Language switcher: two buttons that read as a segmented control, not as a
+   form. Sits with the account links, which is where a reader looks for
+   "settings about me rather than about the library". */
+.lx-lang { display: flex; gap: 0; margin: 0 0 0 auto; }
+/* When the account links are there they already take the free space, so the
+   two sit side by side at the right-hand end; when authentication is off this
+   auto margin is what puts the switcher there on its own. */
+.lx-lang button {
+  appearance: none; background: none; cursor: pointer;
+  border: 1px solid var(--border);
+  padding: .2rem .45rem;
+  font: inherit; font-size: .75rem; letter-spacing: .04em;
+  color: var(--text-muted);
+}
+.lx-lang button:first-child { border-radius: 4px 0 0 4px; }
+.lx-lang button:last-child { border-radius: 0 4px 4px 0; border-left-width: 0; }
+.lx-lang button:hover { color: var(--text); }
+.lx-lang button.active {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-contrast);
+  cursor: default;
+}
+
 .lx-nav-inner {
   max-width: var(--maxw);
   margin: 0 auto;
@@ -343,6 +365,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1.25rem 0; }
 @media (max-width: 1023px) {
   .lx-brand     { order: 1; }
   .lx-account   { order: 2; margin-left: auto; }
+  .lx-lang      { order: 2; margin-left: auto; }
   .lx-hamburger { display: inline-flex; order: 3; }
   .lx-search    { order: 4; flex-basis: 100%; }
   .lx-primary {

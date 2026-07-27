@@ -3,7 +3,7 @@
 
 <!DOCTYPE html>
 
-<html lang="ru" data-theme="{% if 'dark' in css_file %}dark{% else %}light{% endif %}">
+<html lang="{{ request.LANGUAGE_CODE|default:"en" }}" data-theme="{% if 'dark' in css_file %}dark{% else %}light{% endif %}">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -36,7 +36,8 @@
 {% block content %}
 <div class="row"><div class="large-12 column">
     {% block ext-body %} {% endblock %}  {# ext-body #}
-{% cache cache_t body cache_id %}
+{# the language is part of the key: the same page in two languages is two fragments #}
+{% cache cache_t body cache_id request.LANGUAGE_CODE %}
     {% block body %} {% endblock %}  {# body #}
 {% endcache %}
 </div></div>

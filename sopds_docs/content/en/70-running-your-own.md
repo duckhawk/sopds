@@ -44,8 +44,10 @@ Optional, all configured in the admin:
 `SOPDS_ALLOW_REGISTRATION` whether visitors can create their own accounts.
 Filling in the `SOPDS_SMTP_*` settings enables password resets and sending books
 to a device. `SOPDS_OIDC_*` puts a Keycloak button on the login page, and
-`SOPDS_LOGIN_NOTICE` puts a line of your own above the login form — who to ask
-for an account, or what a public demo should be logged into with.
+`SOPDS_LOGIN_NOTICE_EN` / `SOPDS_LOGIN_NOTICE_RU` put a line of your own above
+the login form — who to ask for an account, or what a public demo should be
+logged into with. One per language; whichever is filled in is used when the
+other is not.
 
 The first account has to come from somewhere:
 
@@ -56,6 +58,13 @@ resets its password — so a deployment can run it on every rollout. It takes th
 password on the command line, where the process list can see it, so for anything
 that is not a demo create the account once and change the password from the web
 interface.
+
+## Language
+
+`SOPDS_LANGUAGE` sets the interface language for everyone. On a site several
+people share, `SOPDS_LANGUAGE_SWITCHER` adds a control to the header so each
+visitor can pick for themselves; their choice lives in their session and the
+setting above becomes the default for anyone who has not chosen.
 
 ## Renaming the site
 

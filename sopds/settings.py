@@ -298,10 +298,19 @@ STATIC_ROOT = 'static'
 
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
+# The languages the interface exists in: the source strings are English and
+# there is one translation. Single source of truth — the admin's language
+# setting, the switcher in the header and the middleware that validates what a
+# visitor asked for all read this rather than repeating the pair.
+SITE_LANGUAGES = (
+    ('en-US', 'English'),
+    ('ru-RU', 'Русский'),
+)
+
 CONSTANCE_ADDITIONAL_FIELDS = {
     'language_select': ['django.forms.fields.ChoiceField', {
         'widget': 'django.forms.Select',
-        'choices': (("ru-RU", "Russian"), ("en-US", "English"))
+        'choices': SITE_LANGUAGES,
     }],
     # Masked input for secrets (OIDC client secret, Telegram token) so they are
     # not shown in clear text on the constance admin page. render_value keeps the
@@ -314,7 +323,8 @@ CONSTANCE_ADDITIONAL_FIELDS = {
 }
 
 CONSTANCE_CONFIG = OrderedDict([
-    ('SOPDS_LANGUAGE', ('en-US',_('Select language'),'language_select')),    
+    ('SOPDS_LANGUAGE', ('en-US',_('Select language'),'language_select')),
+    ('SOPDS_LANGUAGE_SWITCHER', (False, _('Let each visitor pick the interface language from the header (otherwise everyone gets the one selected above)'))),
     ('SOPDS_ROOT_LIB', ('books/',_('Absolute path to books collection directory'))),
     ('SOPDS_BOOK_EXTENSIONS', ('.pdf .djvu .fb2 .epub .mobi', _('List of managed book files extensions'))),
     ('SOPDS_SCAN_START_DIRECTLY', (False,_('Turn once scanning directly'))),
@@ -377,7 +387,11 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_TAGS_EDITABLE', (True, _('Let signed-in readers add and remove tags. Turn off if registration is open to strangers.'))),
 
     ('SOPDS_ALLOW_REGISTRATION', (False, _('Let visitors create their own account on the login page'))),
-    ('SOPDS_LOGIN_NOTICE', ('', _('Text shown above the login form — who to ask for an account, or the credentials of a public demo'))),
+    # One per language rather than one string, because with the switcher on, the
+    # same visitor can see the page in either. Whichever is filled in is used
+    # when the other is not, so a single-language installation fills in one.
+    ('SOPDS_LOGIN_NOTICE_EN', ('', _('Text shown above the login form (English) — who to ask for an account, or the credentials of a public demo'))),
+    ('SOPDS_LOGIN_NOTICE_RU', ('', _('Text shown above the login form (Russian)'))),
 
     ('SOPDS_SMTP_HOST', ('', _('SMTP server for password resets and sending books to a device (empty = mail disabled)'))),
     ('SOPDS_SMTP_PORT', (587, _('SMTP port'))),
@@ -400,7 +414,7 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    '1. General Options': ('SOPDS_LANGUAGE', 'SOPDS_ROOT_LIB', 'SOPDS_BOOK_EXTENSIONS','SOPDS_CACHE_TIME', 'SOPDS_SCAN_START_DIRECTLY'),
+    '1. General Options': ('SOPDS_LANGUAGE', 'SOPDS_LANGUAGE_SWITCHER', 'SOPDS_ROOT_LIB', 'SOPDS_BOOK_EXTENSIONS','SOPDS_CACHE_TIME', 'SOPDS_SCAN_START_DIRECTLY'),
     '2. Server Options': ('SOPDS_AUTH', 'SOPDS_ALPHABET_MENU', 'SOPDS_DOUBLES_HIDE', 'SOPDS_COVER_SHOW', 'SOPDS_SPLITITEMS', 'SOPDS_MAXITEMS', 'SOPDS_TITLE_AS_FILENAME', 'SOPDS_NOCOVER_PATH'),    
     '3. Scanner Options': ('SOPDS_FB2SAX','SOPDS_ZIPSCAN','SOPDS_ZIPCODEPAGE', 'SOPDS_INPX_ENABLE', 'SOPDS_INPX_SKIP_UNCHANGED', 'SOPDS_INPX_TEST_ZIP', 'SOPDS_INPX_TEST_FILES', 'SOPDS_DELETE_LOGICAL'),
     '4. Scanner Shedule': ('SOPDS_SCAN_SHED_MIN', 'SOPDS_SCAN_SHED_HOUR', 'SOPDS_SCAN_SHED_DAY','SOPDS_SCAN_SHED_DOW'),
@@ -409,7 +423,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     '7. Log & PID Files': ('SOPDS_SERVER_LOG', 'SOPDS_SCANNER_LOG', 'SOPDS_TELEBOT_LOG','SOPDS_SERVER_PID','SOPDS_SCANNER_PID','SOPDS_TELEBOT_PID'),
     '8. OIDC (Keycloak)': ('SOPDS_OIDC_ENABLE', 'SOPDS_OIDC_ISSUER', 'SOPDS_OIDC_CLIENT_ID', 'SOPDS_OIDC_CLIENT_SECRET', 'SOPDS_OIDC_SCOPES', 'SOPDS_OIDC_BUTTON_TEXT'),
     '9. Reading Progress Sync': ('SOPDS_KOSYNC_ENABLE', 'SOPDS_KOSYNC_ALLOW_REGISTER', 'SOPDS_WEBDAV_ENABLE', 'SOPDS_WEBDAV_ROOT'),
-    '10. Accounts & Mail': ('SOPDS_TAGS_EDITABLE', 'SOPDS_ALLOW_REGISTRATION', 'SOPDS_LOGIN_NOTICE', 'SOPDS_SMTP_HOST', 'SOPDS_SMTP_PORT', 'SOPDS_SMTP_USER', 'SOPDS_SMTP_PASSWORD', 'SOPDS_SMTP_TLS', 'SOPDS_SMTP_SSL', 'SOPDS_MAIL_FROM'),
+    '10. Accounts & Mail': ('SOPDS_TAGS_EDITABLE', 'SOPDS_ALLOW_REGISTRATION', 'SOPDS_LOGIN_NOTICE_EN', 'SOPDS_LOGIN_NOTICE_RU', 'SOPDS_SMTP_HOST', 'SOPDS_SMTP_PORT', 'SOPDS_SMTP_USER', 'SOPDS_SMTP_PASSWORD', 'SOPDS_SMTP_TLS', 'SOPDS_SMTP_SSL', 'SOPDS_MAIL_FROM'),
     '11. Monitoring': ('SOPDS_RATE_LIMIT', 'SOPDS_METRICS_ENABLE', 'SOPDS_METRICS_TOKEN'),
 }
 

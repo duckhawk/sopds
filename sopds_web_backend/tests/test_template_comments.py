@@ -62,7 +62,7 @@ def test_the_login_page_does_not_leak_the_note_above_its_form(client):
     """The one that got out."""
     from constance import config
     config.SOPDS_AUTH = True
-    config.SOPDS_LOGIN_NOTICE = 'Log in as demo / demo.'
+    config.SOPDS_LOGIN_NOTICE_EN = 'Log in as demo / demo.'
 
     body = client.get('/web/login/').content.decode()
     assert 'Log in as demo / demo.' in body

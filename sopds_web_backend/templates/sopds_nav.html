@@ -36,6 +36,19 @@
     </ul>
     {% endif %}
 
+    {% if language_switcher %}
+    {% comment %} POST, not links: switching language changes state for the
+       session, and a browser prefetching a GET would do it uninvited. {% endcomment %}
+    <form class="lx-lang" method="post" action="{% url "web:setlanguage" %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      {% for code, name in site_languages %}
+      <button type="submit" name="language" value="{{ code }}" title="{{ name }}"
+              {% if code == request.LANGUAGE_CODE %}class="active" aria-current="true"{% endif %}>{{ code|slice:":2"|upper }}</button>
+      {% endfor %}
+    </form>
+    {% endif %}
+
     <div class="lx-search">
       <form method="get" action="{% url "web:searchbooks" %}" id="searchform" style="position:relative;">
         {% csrf_token %}
@@ -119,11 +132,14 @@
   function SetSearch() {
     var searchtype = document.querySelector("input[name='searchtype']:checked");
     searchtype = searchtype ? searchtype.id : "title";
-    document.getElementById('main_searchbox').setAttribute("placeholder", "{% trans "Search by" %} " + searchtype);
     document.getElementById('suggesttype').value = searchtype;
     var lbl = document.querySelector("label[for='" + searchtype + "']");
     var lblEl = document.getElementById('searchtype-label');
     if (lbl && lblEl) lblEl.textContent = lbl.textContent.trim();
+    // The label, not the id: the id is "title"/"author"/… in English whatever
+    // the interface language is, and the placeholder read "Искать по title".
+    var what = lbl ? lbl.textContent.trim().toLocaleLowerCase() : searchtype;
+    document.getElementById('main_searchbox').setAttribute("placeholder", "{% trans "Search by" %} " + what);
     var form = document.getElementById('searchform');
     if (searchtype == "title")  form.setAttribute("action", "{% url "web:searchbooks" %}");
     if (searchtype == "author") form.setAttribute("action", "{% url "web:searchauthors" %}");

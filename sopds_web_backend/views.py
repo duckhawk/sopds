@@ -1,15 +1,17 @@
 from functools import wraps
 from random import randint
 
+from django.conf import settings as django_settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template.context_processors import csrf
 from django.core.cache import cache
 from django.db.models import Count, Min, Max, Prefetch
-from django.utils.translation import gettext as _
+from django.utils.translation import get_language, gettext as _
 from django.contrib.auth import authenticate, login, logout, REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.forms import UserCreationForm
+from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_headers
 from django.urls import reverse, reverse_lazy
 from django.utils.html import strip_tags
@@ -23,6 +25,7 @@ from opds_catalog import settings
 from opds_catalog.utils import alphabet_menu, contains_page_ids, contains_page
 from book_tools.format.util import normalize_isbn
 from opds_catalog import collections, delivery, dl, paged, ratings, stats, tags, throttle
+from opds_catalog.middleware import LANGUAGE_SESSION_KEY
 from constance import config
 from sopds_web_backend import oidc
 from sopds import email as mail
@@ -106,6 +109,17 @@ def sopds_login(function=None, redirect_field_name=REDIRECT_FIELD_NAME, url=None
     return actual_decorator
 
 
+def login_notice():
+    """The notice above the login form, in the language being shown.
+
+    Falls back to the other language rather than to nothing: an installation
+    that only filled in one still wants its note read.
+    """
+    by_language = {'ru': config.SOPDS_LOGIN_NOTICE_RU, 'en': config.SOPDS_LOGIN_NOTICE_EN}
+    wanted = (get_language() or 'en').split('-')[0]
+    return by_language.get(wanted) or by_language['en'] or by_language['ru']
+
+
 def sopds_processor(request):
     args={}
     args['app_title'] = settings.TITLE
@@ -115,7 +129,9 @@ def sopds_processor(request):
     # Offering a password reset that cannot be sent is worse than not offering it.
     args['mail_configured'] = mail.is_configured()
     args['oidc_button_text'] = config.SOPDS_OIDC_BUTTON_TEXT
-    args['login_notice'] = config.SOPDS_LOGIN_NOTICE
+    args['login_notice'] = login_notice()
+    args['language_switcher'] = config.SOPDS_LANGUAGE_SWITCHER
+    args['site_languages'] = django_settings.SITE_LANGUAGES
     args['sopds_version'] = settings.VERSION
     args['alphabet'] = config.SOPDS_ALPHABET_MENU
     args['splititems'] = config.SOPDS_SPLITITEMS
@@ -505,6 +521,30 @@ def ThemeView(request):
     else:
         Theme.objects.create(user=request.user, theme_css="css/sopds-dark.css")
     return HttpResponseRedirect(request.META.get('HTTP_REFERER') or reverse('web:main'))
+
+
+@require_POST
+def SetLanguageView(request):
+    """Remember this visitor's choice of interface language for their session.
+
+    POST rather than a link: a language switch changes state, and a browser or
+    a crawler prefetching a GET would flip it under the reader. Django's own
+    `set_language` is POST-only for the same reason; this one exists instead of
+    it because the language here comes from a setting rather than from
+    Accept-Language, so the session key and the fallback are ours.
+    """
+    wanted = request.POST.get('language', '')
+    offered = {code for code, _name in django_settings.SITE_LANGUAGES}
+    if config.SOPDS_LANGUAGE_SWITCHER and wanted in offered:
+        request.session[LANGUAGE_SESSION_KEY] = wanted
+
+    # Back where they were, and only there: a redirect target from a form field
+    # is somewhere an attacker can put a value.
+    target = request.POST.get('next') or request.META.get('HTTP_REFERER') or ''
+    if not url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()},
+                                           require_https=request.is_secure()):
+        target = reverse('web:main')
+    return HttpResponseRedirect(target)
 
 
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")

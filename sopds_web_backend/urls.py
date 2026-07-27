@@ -18,6 +18,7 @@ urlpatterns = [
     re_path(r'^genre/$',views.GenresView, name='genre'),
     re_path(r'^series/$',views.SeriesView, name='series'),
     re_path(r'^theme/$',views.ThemeView, name='theme'),
+    re_path(r'^language/$',views.SetLanguageView, name='setlanguage'),
     re_path(r'^settings/$',views.SettingsView, name='settings'),
     re_path(r'^sync/$',views.DeviceSyncView, name='devicesync'),
     re_path(r'^login/$',views.LoginView, name='login'),
