@@ -14,7 +14,6 @@ import os
 import re
 
 import pytest
-from django.conf import settings
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -82,7 +81,7 @@ def test_no_page_renders_a_comment_marker(client, db, path):
     assert '{#' not in body and '#}' not in body, path
 
 
-def test_the_check_would_have_caught_it(tmp_path):
+def test_the_check_would_have_caught_it():
     """A guard nobody has seen fail is a guard nobody should trust."""
     broken = 'a {# one\nline too many #} b'
     assert spans_lines(broken, broken.index('{#'))
