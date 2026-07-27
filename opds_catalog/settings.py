@@ -4,7 +4,7 @@ from django.conf import settings
 loglevels={'debug':logging.DEBUG,'info':logging.INFO,'warning':logging.WARNING,'error':logging.ERROR,'critical':logging.CRITICAL,'none':logging.NOTSET}
 NOZIP_FORMATS = ['epub', 'mobi']
 
-VERSION = "0.50.0"
+VERSION = "0.51.0"
 TITLE = getattr(settings, "SOPDS_TITLE", "Lectern")
 SUBTITLE = getattr(settings, "SOPDS_SUBTITLE", "Lectern — OPDS catalog. Version %s."%VERSION)
 ICON = getattr(settings, "SOPDS_ICON", "/static/images/favicon.ico")

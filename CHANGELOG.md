@@ -3,7 +3,26 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.51.0] - 2026-07-27
+
+Everything since **v0.50.0**: reading PDF and DjVu in the browser, OPDS 2.0
+alongside the classic feed, tags and shared lists, sending a book to a device
+by mail, self-service accounts, documentation at `/docs`, and the operational
+work — metrics, rate limiting, request ids, a scan history and a backup for the
+data a rescan cannot rebuild.
+
+### Upgrading
+
+- `pip install -r requirements.txt` — there is one new dependency, `Markdown`,
+  used to render the documentation pages.
+- `python3 manage.py migrate` — migrations `0024`–`0028` in `opds_catalog`.
+- Install `djvulibre-bin` if you want DjVu readable in the browser. Without it
+  DjVu books are still listed, searched and downloaded; they simply are not
+  offered to the in-browser reader.
+- If you serve `/static/` from a collected directory, collect again: pdf.js is
+  vendored under `static/js/vendor/pdfjs/`.
+- Every new setting has a default and appears in the admin on its own. Nothing
+  has to be set for the catalogue to keep behaving as it did.
 
 ### Added
 - **`CANONICAL_HOST`** — renaming a site without breaking what is already saved
@@ -54,68 +73,6 @@ All notable changes to this project are documented here. The format is based on
   A page missing from a translation falls back to English instead of 404ing.
   New dependency: `Markdown`.
 
-### Fixed
-- The search box no longer asks to "Искать по title". The placeholder was
-  built from the radio button's id, which is English whatever the interface
-  language is; it now uses the label, and the Russian wording was changed to
-  one that takes the nominative the label carries.
-- The footer no longer hangs in mid-air on a short page. On the login form, an
-  empty search or the welcome page it sat wherever the content happened to end,
-  with the page background below it to the bottom of the window. The page is now
-  at least as tall as the viewport and the content between the nav and the
-  footer absorbs the slack.
-
-### Changed
-- Books in a format that carries no metadata — a PDF or a DjVu scan — no longer
-  keep the file extension in their title. `shuty-i-skomorokhi.djvu` was showing
-  up as the book's name on the card, in the feed and in the search index.
-- **The welcome page** no longer describes the catalogue as a fork of SOPDS and
-  little else. It says what this one actually does now — reading in the browser,
-  OPDS on a device, progress sync, shelves and tags and lists — and points at
-  the documentation. The footer link to the repository followed the rename to
-  `duckhawk/lectern`, and a link to the documentation was added beside it.
-- Filled in the Russian translations that had been left empty: the whole
-  password-reset flow, the send-to-device note in Settings, `Register`, and the
-  "shared by" label on someone else's list.
-- **Reading PDF and DjVu in the browser.** These are the two formats the
-  catalogue happily indexed, served and refused to open: the existing reader
-  turns a book into one long numbered sequence of paragraphs, and a scan has no
-  paragraphs, only ink at fixed coordinates. They now get a second reader that
-  draws pages, sharing the shelf, the progress bar and the saved position with
-  the first — the page number goes through the same `setpos`/`getpos` pair.
-  PDF is drawn by [pdf.js](https://github.com/mozilla/pdf.js) (Apache 2.0,
-  vendored under `static/js/vendor/pdfjs/`, no build step). DjVu is converted
-  to PDF by `ddjvu` from djvulibre, invoked at arm's length as a separate
-  program exactly as the FB2 converters already are, and the result is cached
-  on disk under `SOPDS_TEMP_DIR` — keyed on the same content validator as the
-  ETag, so replacing a file invalidates it, and pruned oldest-first past
-  512 MB. A host without djvulibre simply does not offer DjVu as readable,
-  rather than offering a reader that never loads.
-  The content route answers `Range` requests, which Django does not do on its
-  own: pdf.js asks for the trailer, then the cross-reference table, then the
-  pages actually being looked at, and that is the difference between opening a
-  300 MB scan at once and downloading all of it first. Pages are drawn as they
-  scroll into view and discarded once well behind, so a long book does not run
-  a tablet out of memory.
-  New setting `SOPDS_DJVUTOPDF` (default `ddjvu -format=pdf -quality=75
-  -skip`). `-quality` is not cosmetic: without it a photographic scan converts
-  to lossless raster, and a measured 100-page one came to a gigabyte.
-- **`sopds_userdata_export` / `sopds_userdata_import`** — a backup for the part
-  of the database a rescan cannot rebuild: shelves, statuses, ratings, reading
-  positions, progress synced from e-readers, reader preferences, download and
-  read counters, and the ISBNs, publishers, annotations and dates
-  `sopds_enrich` fetched at the cost of a request each.
-  `dumpdata` does not serve here. Every one of those tables points at `Book` by
-  id, and a rebuilt catalogue assigns different ids, so a restored shelf would
-  name the wrong books. The export keys on identity that survives a rebuild
-  instead: the `(path, filename)` pair the scanner itself uses to recognise a
-  book, falling back to the content digest for a book renamed since. Restoring
-  never overwrites what is already there unless `--force`, so it is safe
-  against a live catalogue and not only into an empty one; counters only ever
-  go up; and anything that cannot be matched is counted and reported rather
-  than guessed at.
-
-### Added
 - **Collections** — named lists of books belonging to a reader, with their own
   page, OPDS feed and search type (`c`), and a picker on the book card.
   Migration `0028`. Deliberately a third thing rather than a variation on the
@@ -186,35 +143,6 @@ All notable changes to this project are documented here. The format is based on
   a backend that reads them at connection time. A password reset that does not
   arrive is then diagnosed and fixed without a redeploy.
 
-### Changed
-- The **Top rated** listing no longer costs more as the library grows. It
-  aggregated over every book and then discarded almost all of them with a
-  `HAVING`, so the work scaled with the catalogue rather than with the number
-  of ratings — measured on sqlite with 200 rated books, 4 ms at 2k books and
-  66 ms at 60k for a result that never changed. Restricting the outer query to
-  the books someone has actually rated makes it flat: 2.6, 2.4 and 2.7 ms at
-  the same three sizes. Migration `0025` adds the `(rating, book)` index the
-  rated-set lookup reads. Ordering is unchanged.
-  **Most popular** was measured too and needed nothing — it is already driven
-  by the small `BookStat` table and was flat at 1.1–1.3 ms across the same
-  range.
-
-### Fixed
-- **An unreachable Redis no longer returns 500 for every page.** Django's
-  `RedisCache` lets connection errors out, and the catalogue reads the cache in
-  a dozen places — cover bytes, rendered EPUBs, the alphabet menu, the stats
-  block on every page, the metrics body, the OIDC discovery document, both
-  throttles — so an outage in something whose only job is to make requests
-  faster took the site down with it. Found while testing the rate limit: the
-  throttle handled a dead cache and the cover view behind it did not.
-  A `ResilientRedisCache` backend now degrades every operation to what it would
-  do against an empty cache — reads miss, writes vanish — which callers already
-  handle. Two consequences, deliberate and worth knowing: while the cache is
-  down neither the login lockout nor the content rate limit is enforced, and
-  covers and EPUBs are re-rendered per request. `lectern_cache_up` reports the
-  state so the degradation is visible rather than merely survivable.
-
-### Added
 - **A correlation id on every request.** Several uwsgi workers interleave their
   output and an e-reader polling feeds produces a great deal of it, so a report
   of "a download failed a few minutes ago" had to be matched against the log by
@@ -294,6 +222,93 @@ All notable changes to this project are documented here. The format is based on
   shelf could only ever be shown whole. The filter is carried through
   pagination, and an unrecognised value shows the whole shelf rather than an
   unexplained empty one.
+
+### Changed
+- Books in a format that carries no metadata — a PDF or a DjVu scan — no longer
+  keep the file extension in their title. `shuty-i-skomorokhi.djvu` was showing
+  up as the book's name on the card, in the feed and in the search index.
+- **The welcome page** no longer describes the catalogue as a fork of SOPDS and
+  little else. It says what this one actually does now — reading in the browser,
+  OPDS on a device, progress sync, shelves and tags and lists — and points at
+  the documentation. The footer link to the repository followed the rename to
+  `duckhawk/lectern`, and a link to the documentation was added beside it.
+- Filled in the Russian translations that had been left empty: the whole
+  password-reset flow, the send-to-device note in Settings, `Register`, and the
+  "shared by" label on someone else's list.
+- **Reading PDF and DjVu in the browser.** These are the two formats the
+  catalogue happily indexed, served and refused to open: the existing reader
+  turns a book into one long numbered sequence of paragraphs, and a scan has no
+  paragraphs, only ink at fixed coordinates. They now get a second reader that
+  draws pages, sharing the shelf, the progress bar and the saved position with
+  the first — the page number goes through the same `setpos`/`getpos` pair.
+  PDF is drawn by [pdf.js](https://github.com/mozilla/pdf.js) (Apache 2.0,
+  vendored under `static/js/vendor/pdfjs/`, no build step). DjVu is converted
+  to PDF by `ddjvu` from djvulibre, invoked at arm's length as a separate
+  program exactly as the FB2 converters already are, and the result is cached
+  on disk under `SOPDS_TEMP_DIR` — keyed on the same content validator as the
+  ETag, so replacing a file invalidates it, and pruned oldest-first past
+  512 MB. A host without djvulibre simply does not offer DjVu as readable,
+  rather than offering a reader that never loads.
+  The content route answers `Range` requests, which Django does not do on its
+  own: pdf.js asks for the trailer, then the cross-reference table, then the
+  pages actually being looked at, and that is the difference between opening a
+  300 MB scan at once and downloading all of it first. Pages are drawn as they
+  scroll into view and discarded once well behind, so a long book does not run
+  a tablet out of memory.
+  New setting `SOPDS_DJVUTOPDF` (default `ddjvu -format=pdf -quality=75
+  -skip`). `-quality` is not cosmetic: without it a photographic scan converts
+  to lossless raster, and a measured 100-page one came to a gigabyte.
+- **`sopds_userdata_export` / `sopds_userdata_import`** — a backup for the part
+  of the database a rescan cannot rebuild: shelves, statuses, ratings, reading
+  positions, progress synced from e-readers, reader preferences, download and
+  read counters, and the ISBNs, publishers, annotations and dates
+  `sopds_enrich` fetched at the cost of a request each.
+  `dumpdata` does not serve here. Every one of those tables points at `Book` by
+  id, and a rebuilt catalogue assigns different ids, so a restored shelf would
+  name the wrong books. The export keys on identity that survives a rebuild
+  instead: the `(path, filename)` pair the scanner itself uses to recognise a
+  book, falling back to the content digest for a book renamed since. Restoring
+  never overwrites what is already there unless `--force`, so it is safe
+  against a live catalogue and not only into an empty one; counters only ever
+  go up; and anything that cannot be matched is counted and reported rather
+  than guessed at.
+
+- The **Top rated** listing no longer costs more as the library grows. It
+  aggregated over every book and then discarded almost all of them with a
+  `HAVING`, so the work scaled with the catalogue rather than with the number
+  of ratings — measured on sqlite with 200 rated books, 4 ms at 2k books and
+  66 ms at 60k for a result that never changed. Restricting the outer query to
+  the books someone has actually rated makes it flat: 2.6, 2.4 and 2.7 ms at
+  the same three sizes. Migration `0025` adds the `(rating, book)` index the
+  rated-set lookup reads. Ordering is unchanged.
+  **Most popular** was measured too and needed nothing — it is already driven
+  by the small `BookStat` table and was flat at 1.1–1.3 ms across the same
+  range.
+
+### Fixed
+- The search box no longer asks to "Искать по title". The placeholder was
+  built from the radio button's id, which is English whatever the interface
+  language is; it now uses the label, and the Russian wording was changed to
+  one that takes the nominative the label carries.
+- The footer no longer hangs in mid-air on a short page. On the login form, an
+  empty search or the welcome page it sat wherever the content happened to end,
+  with the page background below it to the bottom of the window. The page is now
+  at least as tall as the viewport and the content between the nav and the
+  footer absorbs the slack.
+
+- **An unreachable Redis no longer returns 500 for every page.** Django's
+  `RedisCache` lets connection errors out, and the catalogue reads the cache in
+  a dozen places — cover bytes, rendered EPUBs, the alphabet menu, the stats
+  block on every page, the metrics body, the OIDC discovery document, both
+  throttles — so an outage in something whose only job is to make requests
+  faster took the site down with it. Found while testing the rate limit: the
+  throttle handled a dead cache and the cover view behind it did not.
+  A `ResilientRedisCache` backend now degrades every operation to what it would
+  do against an empty cache — reads miss, writes vanish — which callers already
+  handle. Two consequences, deliberate and worth knowing: while the cache is
+  down neither the login lockout nor the content rate limit is enforced, and
+  covers and EPUBs are re-rendered per request. `lectern_cache_up` reports the
+  state so the degradation is visible rather than merely survivable.
 
 ### Removed
 - `Cover0`, the pre-0.41 FB2-only cover extractor. Nothing had referenced it
