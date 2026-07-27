@@ -41,6 +41,9 @@ All notable changes to this project are documented here. The format is based on
   New dependency: `Markdown`.
 
 ### Changed
+- Books in a format that carries no metadata — a PDF or a DjVu scan — no longer
+  keep the file extension in their title. `shuty-i-skomorokhi.djvu` was showing
+  up as the book's name on the card, in the feed and in the search index.
 - **The welcome page** no longer describes the catalogue as a fork of SOPDS and
   little else. It says what this one actually does now — reading in the browser,
   OPDS on a device, progress sync, shelves and tags and lists — and points at
