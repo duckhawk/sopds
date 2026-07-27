@@ -10,7 +10,11 @@ class BookFile(object):
         self.file = file
         self.mimetype = mimetype
         self.original_filename = original_filename
-        self.title = original_filename
+        # A format that carries no metadata — a PDF or a DjVu scan — is left
+        # with its filename as its title. Without the extension: ".pdf" in a
+        # book's title on the card, in the feed and in the search index is
+        # noise nobody meant to put there.
+        self.title = os.path.splitext(original_filename)[0] or original_filename
         self.description = None
         self.authors = []
         self.tags = []
