@@ -63,3 +63,13 @@ def test_probes_are_answered_not_redirected(client, catalogue, path):
 def test_without_a_canonical_host_nothing_is_redirected(client, catalogue):
     """Which is every installation that has only ever had one name."""
     assert client.get(reverse('web:main'), HTTP_HOST=OLD).status_code == 200
+
+
+@override_settings(CANONICAL_HOST=NEW, ALLOWED_HOSTS=[NEW, OLD])
+@pytest.mark.django_db
+def test_the_redirect_stays_on_https_behind_a_proxy(client, catalogue):
+    """The scheme comes from X-Forwarded-Proto (SECURE_PROXY_SSL_HEADER). uwsgi
+    is spoken to over plain HTTP by the ingress, so without that the redirect
+    would quietly downgrade every saved catalogue to http://."""
+    resp = client.get('/opds/', HTTP_HOST=OLD, HTTP_X_FORWARDED_PROTO='https')
+    assert resp['Location'] == 'https://%s/opds/' % NEW
