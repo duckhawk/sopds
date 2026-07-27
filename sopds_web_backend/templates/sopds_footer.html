@@ -54,7 +54,8 @@
 {% endif %}
 
 <div class="lx-footer-bar">
-	<a href="https://github.com/duckhawk/sopds"><i class="fi-social-github"></i>GitHub</a>
+	<a href="{% url "docs:index" %}"><i class="fi-book"></i>{% trans "Help" %}</a>
+	<a href="https://github.com/duckhawk/lectern"><i class="fi-social-github"></i>GitHub</a>
 	<span>{{ app_title }} · v.{{ sopds_version }}</span>
 </div>
 

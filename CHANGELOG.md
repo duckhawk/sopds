@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Documentation at `/docs`**, in Russian and English, linked from the nav and
+  the footer and readable without signing in — the page about connecting an
+  e-reader is exactly what someone who cannot get in yet needs.
+  Seven sections: getting started, reading in the browser, e-readers and OPDS,
+  syncing reading progress, sending a book to a device, how the four ways of
+  grouping books differ, and running your own installation.
+  The pages are markdown files under `sopds_docs/content/<lang>/`, rendered at
+  request time and memoised against their mtime — prose changes far more often
+  than code and is easier to write and translate as markdown than as HTML in
+  template tags, and there is no build step here to pre-render it. The two-digit
+  filename prefix orders the section and is not part of the URL, so reordering
+  is renaming a file rather than editing a list that would drift out of step.
+  A page missing from a translation falls back to English instead of 404ing.
+  New dependency: `Markdown`.
+
+### Changed
+- **The welcome page** no longer describes the catalogue as a fork of SOPDS and
+  little else. It says what this one actually does now — reading in the browser,
+  OPDS on a device, progress sync, shelves and tags and lists — and points at
+  the documentation. The footer link to the repository followed the rename to
+  `duckhawk/lectern`, and a link to the documentation was added beside it.
+- Filled in the Russian translations that had been left empty: the whole
+  password-reset flow, the send-to-device note in Settings, `Register`, and the
+  "shared by" label on someone else's list.
 - **Reading PDF and DjVu in the browser.** These are the two formats the
   catalogue happily indexed, served and refused to open: the existing reader
   turns a book into one long numbered sequence of paragraphs, and a scan has no

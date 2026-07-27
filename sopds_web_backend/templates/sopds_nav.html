@@ -79,6 +79,7 @@
       <li {% if current == "tags" %}class="active"{% endif %}><a href="{% url "web:tags" %}">{% trans "Tags" %}</a></li>
       {% if user.is_authenticated %}<li {% if current == "collections" %}class="active"{% endif %}><a href="{% url "web:collections" %}">{% trans "Lists" %}</a></li>{% endif %}
       <li {% if current == "catalog" %}class="active"{% endif %}><a href="{% url "web:catalog" %}">{% trans "Catalogs" %}</a></li>
+      <li {% if current == "docs" %}class="active"{% endif %}><a href="{% url "docs:index" %}">{% trans "Help" %}</a></li>
 
       {% if not alphabet %}
         <li {% if current == "book" %}class="active"{% endif %}><a href="{% url "web:book" %}?lang=0">{% trans "Books" %}</a></li>

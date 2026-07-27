@@ -1,0 +1,45 @@
+{% extends "sopds_main.html" %}
+{% load i18n %}
+{% block ext-body %}
+<style>
+	.lx-docs { display: flex; gap: 2rem; align-items: flex-start; }
+	.lx-docs-nav { flex: 0 0 15rem; position: sticky; top: 1rem; }
+	.lx-docs-nav ul { list-style: none; margin: 0; padding: 0; }
+	.lx-docs-nav li { margin: 0 0 .15rem 0; }
+	.lx-docs-nav a { display: block; padding: .35rem .6rem; border-radius: 4px; }
+	.lx-docs-nav a.active { background: var(--accent); color: var(--accent-contrast); }
+	.lx-docs-body { flex: 1 1 auto; min-width: 0; max-width: 46rem; }
+	.lx-docs-body h1 { margin-top: 0; }
+	.lx-docs-body h2 { margin-top: 2rem; }
+	.lx-docs-body pre { overflow-x: auto; padding: .6rem .8rem; border-radius: 4px;
+	                    background: rgba(127,127,127,.12); }
+	.lx-docs-body code { background: rgba(127,127,127,.12); padding: .05rem .25rem; border-radius: 3px; }
+	.lx-docs-body pre code { background: none; padding: 0; }
+	.lx-docs-body table { display: block; overflow-x: auto; max-width: 100%; }
+	.lx-docs-body td, .lx-docs-body th { padding: .3rem .6rem; }
+	.lx-docs-body dt { margin-top: .9rem; }
+	.lx-docs-body dd { margin: .2rem 0 0 1.2rem; }
+	@media (max-width: 48rem) {
+		.lx-docs { display: block; }
+		.lx-docs-nav { position: static; margin-bottom: 1.5rem; }
+	}
+</style>
+
+<div class="lx-docs">
+	<nav class="lx-docs-nav" aria-label="{% trans "Documentation" %}">
+		<ul>
+		{% for page_slug, page_title in pages %}
+			<li><a href="{% url 'docs:page' page_slug %}"
+			       class="{% if page_slug == slug %}active{% endif %}">{{ page_title }}</a></li>
+		{% endfor %}
+		</ul>
+	</nav>
+
+	<article class="lx-docs-body">
+		{% if fallback %}
+		<div class="callout">{% trans "This page has not been translated yet and is shown in English." %}</div>
+		{% endif %}
+		{{ body|safe }}
+	</article>
+</div>
+{% endblock %}{# ext-body #}
