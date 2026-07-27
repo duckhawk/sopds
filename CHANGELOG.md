@@ -40,6 +40,13 @@ All notable changes to this project are documented here. The format is based on
   A page missing from a translation falls back to English instead of 404ing.
   New dependency: `Markdown`.
 
+### Fixed
+- The footer no longer hangs in mid-air on a short page. On the login form, an
+  empty search or the welcome page it sat wherever the content happened to end,
+  with the page background below it to the bottom of the window. The page is now
+  at least as tall as the viewport and the content between the nav and the
+  footer absorbs the slack.
+
 ### Changed
 - Books in a format that carries no metadata — a PDF or a DjVu scan — no longer
   keep the file extension in their title. `shuty-i-skomorokhi.djvu` was showing
