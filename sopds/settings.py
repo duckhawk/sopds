@@ -383,6 +383,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('SOPDS_OIDC_CLIENT_SECRET', ('', _('OIDC client secret'), 'password_input')),
     ('SOPDS_OIDC_SCOPES', ('openid email profile', _('OIDC scopes (space-separated)'))),
     ('SOPDS_OIDC_BUTTON_TEXT', ('Log in with Keycloak', _('Text on the OIDC login button'))),
+    ('SOPDS_OIDC_ADMIN_ROLE', ('', _('Keycloak role or group whose members are administrators here (empty = none; administrators then sign in with a local password). Requires a mapper putting roles or groups into the ID token and userinfo.'))),
 
     ('SOPDS_TAGS_EDITABLE', (True, _('Let signed-in readers add and remove tags. Turn off if registration is open to strangers.'))),
 
@@ -421,7 +422,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     '5. Telegramm Bot Options': ('SOPDS_TELEBOT_API_TOKEN','SOPDS_TELEBOT_AUTH','SOPDS_TELEBOT_MAXITEMS'),
     '6. Converters Options': ('SOPDS_FB2TOEPUB', 'SOPDS_FB2TOMOBI', 'SOPDS_DJVUTOPDF', 'SOPDS_TEMP_DIR'),
     '7. Log & PID Files': ('SOPDS_SERVER_LOG', 'SOPDS_SCANNER_LOG', 'SOPDS_TELEBOT_LOG','SOPDS_SERVER_PID','SOPDS_SCANNER_PID','SOPDS_TELEBOT_PID'),
-    '8. OIDC (Keycloak)': ('SOPDS_OIDC_ENABLE', 'SOPDS_OIDC_ISSUER', 'SOPDS_OIDC_CLIENT_ID', 'SOPDS_OIDC_CLIENT_SECRET', 'SOPDS_OIDC_SCOPES', 'SOPDS_OIDC_BUTTON_TEXT'),
+    '8. OIDC (Keycloak)': ('SOPDS_OIDC_ENABLE', 'SOPDS_OIDC_ISSUER', 'SOPDS_OIDC_CLIENT_ID', 'SOPDS_OIDC_CLIENT_SECRET', 'SOPDS_OIDC_SCOPES', 'SOPDS_OIDC_BUTTON_TEXT', 'SOPDS_OIDC_ADMIN_ROLE'),
     '9. Reading Progress Sync': ('SOPDS_KOSYNC_ENABLE', 'SOPDS_KOSYNC_ALLOW_REGISTER', 'SOPDS_WEBDAV_ENABLE', 'SOPDS_WEBDAV_ROOT'),
     '10. Accounts & Mail': ('SOPDS_TAGS_EDITABLE', 'SOPDS_ALLOW_REGISTRATION', 'SOPDS_LOGIN_NOTICE_EN', 'SOPDS_LOGIN_NOTICE_RU', 'SOPDS_SMTP_HOST', 'SOPDS_SMTP_PORT', 'SOPDS_SMTP_USER', 'SOPDS_SMTP_PASSWORD', 'SOPDS_SMTP_TLS', 'SOPDS_SMTP_SSL', 'SOPDS_MAIL_FROM'),
     '11. Monitoring': ('SOPDS_RATE_LIMIT', 'SOPDS_METRICS_ENABLE', 'SOPDS_METRICS_TOKEN'),
