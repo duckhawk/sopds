@@ -68,6 +68,10 @@ let pages = [];        // one entry per page, in order
 let zoom = 1;          // multiplier on top of "as wide as the column"
 let current = 1;
 let saveTimer = null, trimTimer = null, resizeTimer = null;
+// Laying the pages out scrolls the document about before the saved page has
+// been restored; saving then would record the front of the book as where the
+// reader had got to.
+let restored = false;
 
 function ratio() { return window.devicePixelRatio || 1; }
 
@@ -163,9 +167,8 @@ function onScroll() {
 	current = visiblePage();
 	document.getElementById('page-label').textContent = current + ' / ' + pages.length;
 
-	const span = document.documentElement.scrollHeight - window.innerHeight;
-	const percent = span > 0 ? Math.min(100, Math.max(0, window.scrollY / span * 100)) : 100;
-	document.querySelector('#paged-progress .bar').style.width = percent.toFixed(1) + '%';
+	document.querySelector('#paged-progress .bar').style.width =
+		currentPercent().toFixed(1) + '%';
 
 	clearTimeout(saveTimer);
 	saveTimer = setTimeout(savePosition, 1000);
@@ -173,10 +176,19 @@ function onScroll() {
 	trimTimer = setTimeout(trim, 2000);
 }
 
+/** How far through the book the reader has scrolled, 0..100. */
+function currentPercent() {
+	const span = document.documentElement.scrollHeight - window.innerHeight;
+	return span > 0 ? Math.min(100, Math.max(0, window.scrollY / span * 100)) : 100;
+}
+
 function savePosition() {
 	// The same endpoint the flowing reader uses. It stores the position as text
-	// and accepts digits and dots, which a page number is.
-	fetch(SET_POS + '?pos=' + current, { credentials: 'same-origin' }).catch(function () {});
+	// and accepts digits and dots, which a page number is. The percentage rides
+	// along so the shelf shows progress for these books too.
+	if (!restored) return;
+	fetch(SET_POS + '?pos=' + current + '&percent=' + currentPercent().toFixed(1),
+	      { credentials: 'same-origin' }).catch(function () {});
 }
 
 async function restorePosition() {
@@ -187,6 +199,7 @@ async function restorePosition() {
 			window.scrollTo(0, docTop(pages[page - 1].el));
 		}
 	} catch (err) { /* an unremembered position is not a failure */ }
+	restored = true;
 	onScroll();
 }
 

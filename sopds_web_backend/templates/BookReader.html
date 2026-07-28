@@ -17,6 +17,12 @@
 	var timeout = null;
 	var chapters = [];       // array of .sopds-chapter wrapper elements (chapter mode)
 	var curChapter = 0;
+	// Nothing is saved until the saved position has been restored. The scroll
+	// handler is bound while the book is still loading, and a scroll landing
+	// before then would report the top of the book as the place we had got to —
+	// overwriting both the position and the progress, including progress that
+	// arrived from a phone.
+	var restored = false;
 
 	var waitForLoad = function(){
 		if (typeof jQuery != "undefined") {
@@ -40,6 +46,7 @@
 	// Save the id of the first visible paragraph. Hidden chapters have offset 0
 	// and are skipped, so this works in both whole and chapter mode.
 	var SetPos = function(){
+		if (!restored) return;
 		var Reader = $('#ReaderBlock');
 		xPos = window.scrollY;
 		Reader.find('div[id]').each(function(idx,el){
@@ -47,7 +54,10 @@
 			if ((elem.offset().top+elem.height()) > xPos) {
 				var CurrentPos = $(el).attr('id');
 				$.ajax( {
-					url: '{% url 'web:setpos' book_id %}?pos='+CurrentPos,
+					// The percentage goes with the paragraph: it is what the
+					// shelf shows, and what a phone syncing this book speaks.
+					url: '{% url 'web:setpos' book_id %}?pos='+CurrentPos+
+					     '&percent='+currentPercent().toFixed(1),
 					type: 'GET',
 					cache: false
 				});
@@ -62,22 +72,23 @@
 			type: 'GET',
 			cache: false,
 			success: function(lineID) {
-				if (!lineID) { updateProgress(); return; }
+				if (!lineID) { restored = true; updateProgress(); return; }
 				var el = document.getElementById(lineID);
 				if (!el) {
 					// id lookup can miss (ids may repeat); fall back to a scan
 					$('#ReaderBlock div[id]').each(function(idx,e){ if ($(e).attr('id')==lineID){ el=e; return false; } });
 				}
-				if (!el) { updateProgress(); return; }
+				if (!el) { restored = true; updateProgress(); return; }
 				if (ReaderMode === 'chapters' && chapters.length) {
 					var wrap = $(el).closest('.sopds-chapter')[0];
 					var i = chapters.indexOf(wrap);
 					if (i >= 0) showChapter(i, false);
 				}
 				window.scrollTo(0, $(el).offset().top);
+				restored = true;
 				updateProgress();
 			},
-			error: function(){ updateProgress(); }
+			error: function(){ restored = true; updateProgress(); }
 		});
 	}
 
@@ -120,7 +131,7 @@
 	var nextChapter = function(){ showChapter(curChapter + 1); SetPos(); }
 	var prevChapter = function(){ showChapter(curChapter - 1); SetPos(); }
 
-	var updateProgress = function(){
+	var currentPercent = function(){
 		var pct = 0;
 		if (ReaderMode === 'chapters' && chapters.length) {
 			pct = chapters.length > 1 ? curChapter / (chapters.length - 1) * 100 : 100;
@@ -128,7 +139,11 @@
 			var max = document.documentElement.scrollHeight - window.innerHeight;
 			pct = max > 0 ? window.scrollY / max * 100 : 0;
 		}
-		pct = Math.min(100, Math.max(0, pct));
+		return Math.min(100, Math.max(0, pct));
+	}
+
+	var updateProgress = function(){
+		var pct = currentPercent();
 		$('#reader-progress .bar').css('width', pct.toFixed(1) + '%');
 		$('#reader-pct').text(Math.round(pct) + '%');
 	}

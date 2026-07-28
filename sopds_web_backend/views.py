@@ -28,6 +28,7 @@ from opds_catalog import collections, delivery, dl, paged, ratings, stats, tags,
 from opds_catalog.middleware import LANGUAGE_SESSION_KEY
 from constance import config
 from sopds_web_backend import oidc
+from sopds_sync import linking, moonpos, moonsync
 from sopds import email as mail
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
@@ -1007,6 +1008,26 @@ def BSDelView(request):
     return HttpResponseRedirect(target)
 
 
+def _reader_percent(request):
+    """The `percent` the reader reported, as a 0..1 fraction, or None.
+
+    The readers know how far through they are — they draw a progress bar from
+    it — so the figure is taken from them rather than recomputed here, which is
+    the only way the paged reader (whose position is a page number) can
+    contribute progress at all. Anything unparsable is simply not progress.
+    """
+    raw = request.GET.get('percent') if request.GET else None
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    if not 0.0 <= value <= 100.0:
+        return None
+    return value / 100.0
+
+
 @vary_on_headers("HTTP_ACCEPT_LANGUAGE")
 @sopds_login(url='web:login')
 @personal_view
@@ -1017,8 +1038,31 @@ def BSSetPos(request, book_id):
     # verbatim as text; validate to only accept that shape. update_or_create so
     # the position is remembered even if the book is not on the shelf yet.
     if pos and len(pos) <= 32 and all(c in '0123456789.' for c in pos):
-        bookshelf.objects.update_or_create(
+        shelf, _created = bookshelf.objects.update_or_create(
             user=request.user, book_id=book_id, defaults={'position': pos})
+
+        # Progress follows the position rather than only ever going up: this is
+        # the reader moving through the book in front of us, so turning back is
+        # a real thing to record, unlike a device reporting a stale sync. The
+        # status still only ever rises — nothing here un-reads a book.
+        #
+        # Counted in characters where the book allows it, so this figure and the
+        # one a phone syncs are the same measure. What the reader reported is a
+        # scroll fraction, which is all there is to go on for the paged reader
+        # and for anything we cannot measure ourselves.
+        percent = moonpos.fraction_at_paragraph(shelf.book, pos)
+        if percent is None:
+            percent = _reader_percent(request)
+        if percent is not None:
+            fields = ['percent']
+            shelf.percent = percent
+            if linking.raise_status(shelf, percent):
+                fields.append('status')
+            shelf.save(update_fields=fields)
+        # Push the same place back to Moon+ Reader, so a book put down here is
+        # picked up on the phone where it was left. A no-op unless that book is
+        # actually synced to a device.
+        moonsync.publish(request.user, shelf.book, pos)
 
     response = HttpResponse()
     response.write('OK')

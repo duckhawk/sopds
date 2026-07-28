@@ -23,6 +23,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from constance import config
 
+from . import moonsync
 from .auth import authenticate_basic, basic_auth_challenge
 
 DAV_METHODS = ['OPTIONS', 'HEAD', 'GET', 'PUT', 'DELETE', 'MKCOL',
@@ -191,6 +192,11 @@ def dav(request, path=''):
                 if not chunk:
                     break
                 fh.write(chunk)
+        # A Moon+ Reader position marker is worth more than the bytes: read it
+        # onto the shelf so the book carries its progress in the catalogue and
+        # the in-browser reader opens where the phone left off. The file is
+        # stored either way — moonsync never raises.
+        moonsync.ingest(user, path, full)
         return HttpResponse(status=204 if existed else 201)
 
     if method == 'DELETE':

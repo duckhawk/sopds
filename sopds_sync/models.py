@@ -66,6 +66,39 @@ class BookDigest(models.Model):
         return '%s:%s' % (self.method, self.digest)
 
 
+class MoonReaderPosition(models.Model):
+    """The last Moon+ Reader position marker exchanged for one book file.
+
+    Moon+ Reader keeps reading positions as one small file per book in its cloud
+    folder, so the state we have to track is per *file on the device*, not per
+    catalogue book: `path` is where the marker lives in the user's DAV area and
+    is what makes a write-back land where the phone will look for it. `name` is
+    the book's file name there, which is all the protocol offers to identify
+    what is being read; `book` is what we managed to match it to, and may be
+    null for a book this catalogue does not hold.
+
+    `rule` records which reading of Moon+ Reader's chapter numbering reproduced
+    the marker's own percentage against our copy (see :mod:`sopds_sync.moonpos`).
+    Empty means no reading did, which is the signal that the file on the phone
+    is not the edition we have — progress still syncs as a percentage, but
+    chapter coordinates must not be written back.
+    """
+    user = models.ForeignKey(User, db_index=True, on_delete=models.CASCADE)
+    path = models.CharField(max_length=1024)
+    name = models.CharField(max_length=512)
+    book = models.ForeignKey(Book, null=True, default=None, db_index=True,
+                             on_delete=models.SET_NULL)
+    marker = models.CharField(max_length=64)
+    rule = models.CharField(max_length=16, blank=True, default='')
+    updated = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        unique_together = ['user', 'path']
+
+    def __str__(self):
+        return '%s:%s' % (self.user.username, self.name)
+
+
 class KosyncProgress(models.Model):
     """One document's reading progress for a user — the kosync key-value store.
 
