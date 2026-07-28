@@ -67,6 +67,30 @@ def test_ropc_denies_staff(oidc_on, discovery, monkeypatch):
 
 
 @pytest.mark.django_db
+def test_ropc_admin_role_signs_in_and_is_cached(oidc_on, discovery, monkeypatch):
+    """An administrator the IdP names may use an e-reader too — including on
+    the second request, which the credential cache answers."""
+    config.SOPDS_OIDC_ADMIN_ROLE = 'lectern-admin'
+    monkeypatch.setattr(oidc.requests, 'post', lambda *a, **k: _Resp(200, {'access_token': 'AT'}))
+    monkeypatch.setattr(oidc.requests, 'get', lambda *a, **k: _Resp(200, {
+        'preferred_username': 'chief', 'realm_access': {'roles': ['lectern-admin']}}))
+    try:
+        user = oidc.authenticate_password('chief', 'pw')
+        assert user is not None and user.is_superuser
+
+        # Second call is served from the cache; it must not refuse the account
+        # it just provisioned.
+        monkeypatch.setattr(oidc.requests, 'post', _unreachable)
+        assert oidc.authenticate_password('chief', 'pw') == user
+    finally:
+        config.SOPDS_OIDC_ADMIN_ROLE = ''
+
+
+def _unreachable(*args, **kwargs):
+    raise AssertionError('Keycloak must not be called again for cached credentials')
+
+
+@pytest.mark.django_db
 def test_opds_feed_basic_auth_via_ropc(client, oidc_on, monkeypatch):
     kc_user = User.objects.create_user('kcreader', 'k@x.y', '!unusable')
     monkeypatch.setattr(oidc, 'authenticate_password', lambda u, p: kc_user)

@@ -1298,10 +1298,16 @@ def OIDCCallbackView(request):
         return handler403(request, args)
 
     userinfo = token.get('userinfo') or client.userinfo(token=token)
-    user = oidc.provision_user(userinfo)
+    # The access token is passed for its role claims only: Keycloak carries
+    # realm roles there by default and puts them in the ID token or userinfo
+    # only once a mapper says so.
+    user = oidc.provision_user(userinfo, token.get('access_token'))
     if user is None:
         args = {'breadcrumbs': [_('Login')], 'css_file': 'css/sopds.css',
-                'system_message': {'text': _('This account cannot sign in via OIDC.'), 'type': 'alert'}}
+                'system_message': {
+                    'text': _('This account cannot sign in via OIDC — administrator '
+                              'accounts sign in with a local password.'),
+                    'type': 'alert'}}
         return handler403(request, args)
 
     login(request, user, backend='django.contrib.auth.backends.ModelBackend')

@@ -3,6 +3,54 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **`SOPDS_OIDC_ADMIN_ROLE`** — administrator rights from a Keycloak role,
+  client role or group. Until now an OIDC login was refused outright for a
+  username that already belonged to a staff or superuser account, so an
+  administrator could sign in neither through the button on the login page nor
+  with Keycloak credentials from an e-reader over OPDS. That guard exists
+  because otherwise whoever can pick a username in the IdP could take over the
+  account that runs the catalogue, so it stays as the default; naming a role in
+  the new setting is what moves the decision to Keycloak.
+  Whoever carries the role becomes staff and superuser at their next login, and
+  loses those flags again — keeping the account and everything on its shelf —
+  when the role is revoked. Only what this granted does it take back: an
+  administrator made locally is still refused a login that does not carry the
+  role, since those rights were not the IdP's to revoke and admitting the login
+  would hand the account to a namesake. The two are told apart by membership of
+  an `oidc-admins` group, which is stock Django auth and needs no migration.
+  Realm and client roles are read from the access token, which Keycloak fills
+  in by default — no mapper needed, in the browser or over OPDS — because the
+  ID token and userinfo carry them only once one is configured. The token is
+  parsed without verifying its signature, which is sound and nothing more:
+  it was fetched by this server from the token endpoint over TLS and never
+  passed through a browser, and only role claims are read from it, never
+  identity. Group membership does need a **Group Membership** mapper; a group
+  matches by full path or by its last segment.
+  With the setting filled in, whoever can grant that role in Keycloak can
+  administer the catalogue. That is the point of it, and the reason it is empty
+  by default.
+
+### Changed
+- The 403 an OIDC login is refused with now says what to do about it —
+  administrator accounts sign in with a local password — instead of only that
+  the account cannot sign in this way.
+
+### Fixed
+- **Logging out of the Django admin answered 405.** `admin/base.html` was
+  overridden here with a copy of the template from Django 1.x, which shadowed
+  the stock one entirely and logged out with a plain link — and `LogoutView`
+  has refused anything but POST since Django 5.0, so the only way out of the
+  admin was an error page. The copy carried nothing of this project's own; the
+  branding lives in `admin/base_site.html`, which overrides only what it means
+  to. Removing it fixes the logout and, incidentally, restores the admin
+  Django 5 actually ships: navigation sidebar, dark mode, a layout that works
+  on a phone.
+  If you serve `/static/` from a collected directory, collect again — the
+  modern admin loads stylesheets and scripts the 1.x template never asked for.
+
 ## [0.51.0] - 2026-07-27
 
 Everything since **v0.50.0**: reading PDF and DjVu in the browser, OPDS 2.0

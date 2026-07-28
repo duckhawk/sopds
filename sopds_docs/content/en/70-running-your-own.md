@@ -59,6 +59,32 @@ password on the command line, where the process list can see it, so for anything
 that is not a demo create the account once and change the password from the web
 interface.
 
+### Administrators and Keycloak
+
+By default an OIDC login provisions an ordinary reader, and a login is refused
+when the username already belongs to an administrator — otherwise anyone who can
+pick a username in Keycloak could take over the account that runs the catalogue.
+Administrators sign in with a local password at `/web/login/`.
+
+`SOPDS_OIDC_ADMIN_ROLE` moves that decision to Keycloak. Name a realm role, a
+client role or a group in it, and whoever carries it becomes an administrator
+here at their next login — and stops being one, without losing the account or
+anything on their shelf, when the role is taken away. Groups match either by
+full path (`staff/librarians`) or by their last segment (`librarians`).
+
+An administrator you made locally is still refused a login that does not carry
+the role: those rights were not Keycloak's to grant, so they are not Keycloak's
+to revoke, and admitting the login would hand the account to a namesake.
+
+Keycloak carries realm and client roles in the access token, which is read
+directly here, so those need no mapper — in the browser or over OPDS. Group
+membership is sent by nothing unless you add a **Group Membership** mapper to
+the client, with *Add to ID token* and *Add to userinfo* both switched on.
+
+Worth stating plainly: with the setting filled in, whoever can grant that role in
+Keycloak can administer this catalogue. That is what it is for, and why it is
+empty by default.
+
 ## Language
 
 `SOPDS_LANGUAGE` sets the interface language for everyone. On a site several
