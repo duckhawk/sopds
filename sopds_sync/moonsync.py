@@ -76,14 +76,22 @@ def _identify(name, marker):
         return None, None
     if len(candidates) == 1:
         book = candidates[0]
-        return book, moonpos.fit(book, marker)
+        return book, moonpos.fit(book, marker)[0]
 
+    # Editions of one novel differ by a few tenths of a percent, well inside the
+    # tolerance, so several of them routinely pass. The closest reproduction is
+    # the best evidence available — taking the first to pass instead would be
+    # deciding by database id.
+    best, best_gap, best_outline = None, None, None
     for book in candidates:
-        outline = moonpos.fit(book, marker)
-        if outline is not None:
-            logger.debug('Moon+ file %r identified as book %s of %d candidates',
-                         name, book.id, len(candidates))
-            return book, outline
+        outline, gap = moonpos.fit(book, marker)
+        if outline is not None and (best_gap is None or gap < best_gap):
+            best, best_gap, best_outline = book, gap, outline
+
+    if best is not None:
+        logger.debug('Moon+ file %r identified as book %s of %d candidates '
+                     '(%.2f%% off)', name, best.id, len(candidates), best_gap)
+        return best, best_outline
 
     logger.debug('Moon+ file %r matches %d editions and none of them fits',
                  name, len(candidates))

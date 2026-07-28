@@ -156,20 +156,26 @@ def _walk(book_root):
 
     def descend(element, depth, section_index_path):
         nonlocal cursor
+        # Both counters mirror what the XSL asks lxml for per element —
+        # `preceding-sibling::fb:section` and `xsl:number` — but kept as running
+        # totals. Asking per element walks the siblings again every time, which
+        # is quadratic in a chapter's paragraph count and turns parsing a novel
+        # into tens of seconds.
+        sections_before = 0
+        paragraphs_before = 0
         for child in element:
             tag = child.tag
             if tag == FB2_NS + 'section':
                 # The id the XSL builds counts preceding siblings across every
                 # ancestor section, so the running total is carried down.
-                preceding = sum(1 for s in child.itersiblings(FB2_NS + 'section',
-                                                              preceding=True))
-                yield 'section', child, depth, cursor, section_index_path + preceding
-                yield from descend(child, depth + 1, section_index_path + preceding)
+                index = section_index_path + sections_before
+                yield 'section', child, depth, cursor, index
+                yield from descend(child, depth + 1, index)
+                sections_before += 1
             elif tag == FB2_NS + 'p':
                 # xsl:number counts p elements among their siblings, 1-based.
-                position = sum(1 for _ in child.itersiblings(FB2_NS + 'p',
-                                                             preceding=True)) + 1
-                yield 'p', '%d.%d' % (section_index_path + 1, position), cursor
+                paragraphs_before += 1
+                yield 'p', '%d.%d' % (section_index_path + 1, paragraphs_before), cursor
                 cursor += _text_len(child)
             else:
                 # Titles, epigraphs, poems: text that is read but is not a
@@ -269,15 +275,21 @@ def for_rule(book, rule_name):
 
 
 def fit(book, marker):
-    """The rule whose replay of `marker` reproduces its percentage, or None.
+    """``(outline, gap)`` for the rule whose replay of `marker` reproduces its
+    percentage, or ``(None, None)``.
 
     This is the check that decides whether we may write coordinates back: a hit
     means our copy is divided into chapters the same way and measures the same
     length, so a coordinate computed here means on the phone what it means here.
+
+    The gap comes back with it because one book is rarely the only candidate: a
+    catalogue can hold several editions of a novel, all of them close enough to
+    pass, and how closely each reproduced the marker is the only thing left to
+    tell them apart.
     """
     built = candidates(book)
     if not built:
-        return None
+        return None, None
 
     best, best_gap = None, None
     for outline in built:
@@ -292,4 +304,4 @@ def fit(book, marker):
         logger.debug('Book %s matches Moon+ rule %s (%.2f%% off)',
                      book.id, best.rule, best_gap)
         cache.set(_cache_key(book, best.rule), best, 24 * 3600)
-    return best
+    return best, best_gap

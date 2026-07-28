@@ -141,8 +141,9 @@ def test_book_name_strips_the_marker_suffix():
 @pytest.mark.django_db
 def test_fit_accepts_the_rule_that_reproduces_the_percentage(book):
     outline = outline_for(book)
-    fitted = moonpos.fit(book, marker_at(outline, 5, 400))
+    fitted, gap = moonpos.fit(book, marker_at(outline, 5, 400))
     assert fitted is not None
+    assert gap <= moonpos.PERCENT_TOLERANCE
     assert fitted.percent_at(5, 400) == pytest.approx(outline.percent_at(5, 400))
 
 
@@ -150,12 +151,12 @@ def test_fit_accepts_the_rule_that_reproduces_the_percentage(book):
 def test_fit_rejects_a_marker_from_a_different_edition(book):
     # Coordinates that cannot produce this percentage against our copy: the
     # phone is reading some other edition of the book.
-    assert moonpos.fit(book, moonreader.parse('1*5@0#400:99.0%')) is None
+    assert moonpos.fit(book, moonreader.parse('1*5@0#400:99.0%')) == (None, None)
 
 
 @pytest.mark.django_db
 def test_fit_rejects_a_chapter_our_copy_does_not_have(book):
-    assert moonpos.fit(book, moonreader.parse('1*4000@0#0:50.0%')) is None
+    assert moonpos.fit(book, moonreader.parse('1*4000@0#0:50.0%')) == (None, None)
 
 
 @pytest.mark.django_db
@@ -282,6 +283,33 @@ def test_the_marker_picks_the_edition_the_phone_is_reading(client, user, book, m
     assert row.rule
     assert bookshelf.objects.get(user=user, book=book).position == \
         outline.resume_paragraph(5, 400)
+
+
+@pytest.mark.django_db
+def test_the_closest_edition_wins_not_the_first(client, user, book, monkeypatch):
+    # Editions of one novel sit within tenths of a percent of each other, so
+    # several pass the tolerance at once and the order they are offered in must
+    # not decide. Here a slightly-off candidate is offered first.
+    near = other_edition(book, filename='near.fb2')
+    outline = outline_for(book)
+    marker = marker_at(outline, 5, 400)
+    off_by_a_little = moonpos.Outline(
+        'all', [s + 300 for s in outline.starts], outline.total, outline.paragraphs)
+
+    real_fit = moonpos.fit
+
+    def fake_fit(candidate, m):
+        if candidate.id == near.id:
+            gap = abs(off_by_a_little.percent_at(m.chapter, m.offset) - m.percent)
+            return off_by_a_little, gap
+        return real_fit(book, m)
+
+    monkeypatch.setattr(linking, 'resolve_books_by_name', lambda name: [near, book])
+    monkeypatch.setattr(moonsync.moonpos, 'fit', fake_fit)
+    make_cache_dir(client)
+
+    put_marker(client, 'The Sanctuary Sparrow.fb2', marker)
+    assert MoonReaderPosition.objects.get(user=user).book == book
 
 
 @pytest.mark.django_db
