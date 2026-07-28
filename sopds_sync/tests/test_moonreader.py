@@ -231,20 +231,69 @@ def test_resolve_by_title_and_author(book):
     assert linking.resolve_book_by_name('The Sanctuary Sparrow - Peters Ellis.fb2') == book
 
 
-@pytest.mark.django_db
-def test_resolve_refuses_to_choose_between_editions(book):
-    Book.objects.create(
-        filename='other.fb2', path='.', filesize=1, format='fb2', cat_type=0,
+def other_edition(book, filename='other.fb2'):
+    """A second catalogue row for the same work — a different file entirely."""
+    return Book.objects.create(
+        filename=filename, path='.', filesize=1, format='fb2', cat_type=0,
         docdate='2011', lang='en', title='The Sanctuary Sparrow',
         search_title='THE SANCTUARY SPARROW', annotation='', avail=2,
         catalog=book.catalog,
     )
+
+
+@pytest.mark.django_db
+def test_resolve_returns_every_edition_of_an_ambiguous_name(book):
+    # A catalogue built from a public library dump holds the same novel several
+    # times; the name cannot tell them apart, so all of them come back and the
+    # marker decides.
+    other = other_edition(book)
+    found = linking.resolve_books_by_name('The Sanctuary Sparrow.fb2')
+    assert {b.id for b in found} == {book.id, other.id}
     assert linking.resolve_book_by_name('The Sanctuary Sparrow.fb2') is None
+
+
+@pytest.mark.django_db
+def test_a_definite_name_does_not_drag_in_other_editions(book):
+    other_edition(book)
+    # The catalogue's own file name identifies one file, so there is nothing
+    # to weigh up.
+    assert linking.resolve_books_by_name(FB2) == [book]
 
 
 @pytest.mark.django_db
 def test_resolve_unknown_name(book):
     assert linking.resolve_book_by_name('Something Else - Nobody.fb2') is None
+
+
+@pytest.mark.django_db
+def test_the_marker_picks_the_edition_the_phone_is_reading(client, user, book, monkeypatch):
+    # Two editions under one name, the one that cannot possibly be the phone's
+    # copy offered first. What decides is the marker reproducing itself against
+    # a candidate, not the name and not the order the rows arrive in.
+    decoy = other_edition(book, filename='missing.fb2')
+    monkeypatch.setattr(linking, 'resolve_books_by_name', lambda name: [decoy, book])
+    make_cache_dir(client)
+    outline = outline_for(book)
+
+    put_marker(client, 'The Sanctuary Sparrow.fb2', marker_at(outline, 5, 400))
+
+    row = MoonReaderPosition.objects.get(user=user)
+    assert row.book == book
+    assert row.rule
+    assert bookshelf.objects.get(user=user, book=book).position == \
+        outline.resume_paragraph(5, 400)
+
+
+@pytest.mark.django_db
+def test_an_ambiguous_name_that_fits_nothing_credits_no_book(client, user, book):
+    other_edition(book)
+    make_cache_dir(client)
+    # Several editions, and the coordinates describe none of them: crediting
+    # one at random would be a silent guess.
+    put_marker(client, 'The Sanctuary Sparrow.fb2', moonreader.parse('1*5@0#400:99.0%'))
+
+    assert MoonReaderPosition.objects.get(user=user).book is None
+    assert not bookshelf.objects.exists()
 
 
 # --- in: the phone uploads a position --------------------------------------

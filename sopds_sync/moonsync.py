@@ -56,6 +56,40 @@ def _record(user, path, marker, book, rule):
         })
 
 
+def _identify(name, marker):
+    """``(book, outline)`` for a device file name — the marker breaking ties.
+
+    A name like "Title - Author.fb2" routinely matches several editions of the
+    same novel in a catalogue built from a public library dump, and nothing in
+    the name says which one is on the phone. The marker does: it reports a
+    percentage alongside the coordinates that produced it, and only the edition
+    laid out the way the phone's copy is laid out will reproduce it.
+
+    So the same check that decides whether coordinates may be written back also
+    picks the edition — the two questions are one question. Where nothing fits
+    and the name was ambiguous, no book is returned at all: crediting reading
+    progress to an arbitrary one of several editions would be a guess, and a
+    silent one.
+    """
+    candidates = linking.resolve_books_by_name(name)
+    if not candidates:
+        return None, None
+    if len(candidates) == 1:
+        book = candidates[0]
+        return book, moonpos.fit(book, marker)
+
+    for book in candidates:
+        outline = moonpos.fit(book, marker)
+        if outline is not None:
+            logger.debug('Moon+ file %r identified as book %s of %d candidates',
+                         name, book.id, len(candidates))
+            return book, outline
+
+    logger.debug('Moon+ file %r matches %d editions and none of them fits',
+                 name, len(candidates))
+    return None, None
+
+
 def ingest(user, path, full_path):
     """Take in a position marker the device has just uploaded.
 
@@ -73,7 +107,7 @@ def ingest(user, path, full_path):
             return None
 
         name = moonreader.book_name(path)
-        book = linking.resolve_book_by_name(name)
+        book, outline = _identify(name, marker)
         if book is None:
             # Worth keeping even so: the marker is the user's data, and a book
             # added to the catalogue later can be matched on the next upload.
@@ -81,7 +115,6 @@ def ingest(user, path, full_path):
             logger.debug('No catalogue book for Moon+ file %r', name)
             return None
 
-        outline = moonpos.fit(book, marker)
         _record(user, path, marker, book, outline.rule if outline else '')
 
         was = bookshelf.objects.filter(user=user, book=book).values_list(

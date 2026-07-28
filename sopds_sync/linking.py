@@ -35,8 +35,14 @@ def resolve_book(document):
     return row.book if row else None
 
 
-def resolve_book_by_name(name):
-    """The Book a file name on a reading device refers to, or None.
+#: How many same-title editions are worth weighing against one position marker.
+#: Each costs a parse of the whole book, and a shelf of a public library dump
+#: can hold a startling number of copies of a popular novel.
+MAX_CANDIDATES = 6
+
+
+def resolve_books_by_name(name):
+    """Catalogue books a file name on a reading device could refer to.
 
     Moon+ Reader names a position file after the book file as it exists on the
     phone, which is the only identification the format offers. Three ways in,
@@ -49,16 +55,23 @@ def resolve_book_by_name(name):
     2. The catalogue's own file name, for a library whose files were named the
        way the catalogue names them.
     3. "Title - Author" — what a book downloaded from a public library site is
-       usually called. Only used when the first two miss, and only when it picks
-       out exactly one book: guessing between editions would attribute reading
-       progress to the wrong one.
+       usually called, and the only route left for a book that did not come
+       from here at all.
+
+    The first two identify a single file and return it alone. The third
+    routinely does not: a catalogue built from a public library dump holds the
+    same novel several times over, by the same author, under the same title, and
+    the name on the phone cannot tell them apart. Rather than guess or give up,
+    it returns every edition it found — the caller has a position marker, which
+    is better evidence than the name ever was (see
+    :func:`sopds_sync.moonsync.ingest`).
     """
     from opds_catalog.models import Book
 
     from .digest import filename_md5
 
     if not name:
-        return None
+        return []
 
     # Moon+ Reader reads fb2.zip without unpacking, so the name it records can
     # carry the .zip our download appends.
@@ -69,37 +82,56 @@ def resolve_book_by_name(name):
     for variant in variants:
         book = resolve_book(filename_md5(variant))
         if book is not None:
-            return book
+            return [book]
 
     for variant in variants:
         book = Book.objects.filter(filename=variant).first()
         if book is not None:
-            return book
+            return [book]
 
     for variant in variants:
         stem = variant.rsplit('.', 1)[0] if '.' in variant else variant
-        if ' - ' not in stem:
-            continue
-        title, _, author = stem.partition(' - ')
-        title, author = title.strip(), author.strip()
-        if not title:
-            continue
-        # "Surname Firstname" is exactly how the catalogue stores an author, so
-        # the whole half matches as it stands; falling back to every word being
-        # present covers a middle name the file name dropped.
-        query = Book.objects.filter(title__iexact=title)
-        if author:
-            by_full = query.filter(authors__full_name__iexact=author)
-            if by_full.exists():
-                query = by_full
-            else:
-                for part in author.split():
-                    query = query.filter(authors__full_name__icontains=part)
-        found = list(query.distinct()[:2])
-        if len(found) == 1:
-            return found[0]
+        for title, author in _title_author(stem):
+            # "Surname Firstname" is exactly how the catalogue stores an author,
+            # so the whole half matches as it stands; falling back to every word
+            # being present covers a middle name the file name dropped.
+            query = Book.objects.filter(title__iexact=title)
+            if author:
+                by_full = query.filter(authors__full_name__iexact=author)
+                if by_full.exists():
+                    query = by_full
+                else:
+                    for part in author.split():
+                        query = query.filter(authors__full_name__icontains=part)
+            found = list(query.distinct().order_by('id')[:MAX_CANDIDATES])
+            if found:
+                return found
 
-    return None
+    return []
+
+
+def _title_author(stem):
+    """Ways to read a bare file name as a title and possibly an author.
+
+    "Title - Author" first, because that is what the download links of the
+    public library sites produce, then the whole name as a title: plenty of
+    shelves hold books named after nothing but their title, and a title with a
+    dash in it would otherwise be split down the middle and never found.
+    """
+    attempts = []
+    if ' - ' in stem:
+        title, _, author = stem.partition(' - ')
+        if title.strip():
+            attempts.append((title.strip(), author.strip()))
+    if stem.strip():
+        attempts.append((stem.strip(), ''))
+    return attempts
+
+
+def resolve_book_by_name(name):
+    """The one book a device file name refers to, or None if it is not clear."""
+    found = resolve_books_by_name(name)
+    return found[0] if len(found) == 1 else None
 
 
 def status_for(percentage):
