@@ -38,6 +38,19 @@ All notable changes to this project are documented here. The format is based on
   administrator accounts sign in with a local password — instead of only that
   the account cannot sign in this way.
 
+### Fixed
+- **Logging out of the Django admin answered 405.** `admin/base.html` was
+  overridden here with a copy of the template from Django 1.x, which shadowed
+  the stock one entirely and logged out with a plain link — and `LogoutView`
+  has refused anything but POST since Django 5.0, so the only way out of the
+  admin was an error page. The copy carried nothing of this project's own; the
+  branding lives in `admin/base_site.html`, which overrides only what it means
+  to. Removing it fixes the logout and, incidentally, restores the admin
+  Django 5 actually ships: navigation sidebar, dark mode, a layout that works
+  on a phone.
+  If you serve `/static/` from a collected directory, collect again — the
+  modern admin loads stylesheets and scripts the 1.x template never asked for.
+
 ## [0.51.0] - 2026-07-27
 
 Everything since **v0.50.0**: reading PDF and DjVu in the browser, OPDS 2.0
