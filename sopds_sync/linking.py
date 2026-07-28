@@ -35,6 +35,73 @@ def resolve_book(document):
     return row.book if row else None
 
 
+def resolve_book_by_name(name):
+    """The Book a file name on a reading device refers to, or None.
+
+    Moon+ Reader names a position file after the book file as it exists on the
+    phone, which is the only identification the format offers. Three ways in,
+    cheapest first:
+
+    1. The digest index :mod:`sopds_sync.indexing` already maintains. It holds
+       an md5 of every name a book can carry after an OPDS download, so a book
+       fetched from this catalogue is one indexed lookup away — the same table
+       that resolves KOReader hashes, reused rather than rebuilt.
+    2. The catalogue's own file name, for a library whose files were named the
+       way the catalogue names them.
+    3. "Title - Author" — what a book downloaded from a public library site is
+       usually called. Only used when the first two miss, and only when it picks
+       out exactly one book: guessing between editions would attribute reading
+       progress to the wrong one.
+    """
+    from opds_catalog.models import Book
+
+    from .digest import filename_md5
+
+    if not name:
+        return None
+
+    # Moon+ Reader reads fb2.zip without unpacking, so the name it records can
+    # carry the .zip our download appends.
+    variants = [name]
+    if name.lower().endswith('.zip'):
+        variants.append(name[:-len('.zip')])
+
+    for variant in variants:
+        book = resolve_book(filename_md5(variant))
+        if book is not None:
+            return book
+
+    for variant in variants:
+        book = Book.objects.filter(filename=variant).first()
+        if book is not None:
+            return book
+
+    for variant in variants:
+        stem = variant.rsplit('.', 1)[0] if '.' in variant else variant
+        if ' - ' not in stem:
+            continue
+        title, _, author = stem.partition(' - ')
+        title, author = title.strip(), author.strip()
+        if not title:
+            continue
+        # "Surname Firstname" is exactly how the catalogue stores an author, so
+        # the whole half matches as it stands; falling back to every word being
+        # present covers a middle name the file name dropped.
+        query = Book.objects.filter(title__iexact=title)
+        if author:
+            by_full = query.filter(authors__full_name__iexact=author)
+            if by_full.exists():
+                query = by_full
+            else:
+                for part in author.split():
+                    query = query.filter(authors__full_name__icontains=part)
+        found = list(query.distinct()[:2])
+        if len(found) == 1:
+            return found[0]
+
+    return None
+
+
 def status_for(percentage):
     """The bookshelf status implied by a reported progress fraction."""
     if percentage >= FINISHED_AT:

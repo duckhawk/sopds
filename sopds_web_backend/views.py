@@ -28,6 +28,7 @@ from opds_catalog import collections, delivery, dl, paged, ratings, stats, tags,
 from opds_catalog.middleware import LANGUAGE_SESSION_KEY
 from constance import config
 from sopds_web_backend import oidc
+from sopds_sync import moonsync
 from sopds import email as mail
 from opds_catalog.opds_paginator import Paginator as OPDS_Paginator
 
@@ -1017,8 +1018,12 @@ def BSSetPos(request, book_id):
     # verbatim as text; validate to only accept that shape. update_or_create so
     # the position is remembered even if the book is not on the shelf yet.
     if pos and len(pos) <= 32 and all(c in '0123456789.' for c in pos):
-        bookshelf.objects.update_or_create(
+        shelf, _created = bookshelf.objects.update_or_create(
             user=request.user, book_id=book_id, defaults={'position': pos})
+        # Push the same place back to Moon+ Reader, so a book put down here is
+        # picked up on the phone where it was left. A no-op unless that book is
+        # actually synced to a device.
+        moonsync.publish(request.user, shelf.book, pos)
 
     response = HttpResponse()
     response.write('OK')
