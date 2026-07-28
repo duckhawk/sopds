@@ -130,6 +130,57 @@ def test_bookshelf_add_status_rating_pos_clear(logged_client, user, sample_libra
 
 
 @pytest.mark.django_db
+def test_setpos_records_the_progress_the_reader_reports(logged_client, user, sample_library):
+    # The reader sends the percentage behind its own progress bar, which is the
+    # only way a book read here — rather than on a phone — shows progress on the
+    # shelf at all.
+    bid = Book.objects.first().id
+    logged_client.get(reverse("web:setpos", args=[bid]), {"pos": "2.13", "percent": "41.5"})
+    shelf = bookshelf.objects.get(user=user, book_id=bid)
+    assert shelf.position == "2.13"
+    assert shelf.percent == pytest.approx(0.415)
+    assert shelf.status == bookshelf.STATUS_READING
+
+
+@pytest.mark.django_db
+def test_setpos_finishing_the_book_marks_it_read(logged_client, user, sample_library):
+    bid = Book.objects.first().id
+    logged_client.get(reverse("web:setpos", args=[bid]), {"pos": "9.1", "percent": "100"})
+    assert bookshelf.objects.get(user=user, book_id=bid).status == bookshelf.STATUS_READ
+
+
+@pytest.mark.django_db
+def test_setpos_turning_back_lowers_progress_but_not_status(logged_client, user, sample_library):
+    bid = Book.objects.first().id
+    logged_client.get(reverse("web:setpos", args=[bid]), {"pos": "9.1", "percent": "100"})
+    # Turning back is the reader in front of us moving, not a stale sync, so the
+    # figure follows them down — but a book already finished stays read.
+    logged_client.get(reverse("web:setpos", args=[bid]), {"pos": "1.1", "percent": "2.0"})
+    shelf = bookshelf.objects.get(user=user, book_id=bid)
+    assert shelf.percent == pytest.approx(0.02)
+    assert shelf.status == bookshelf.STATUS_READ
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("percent", ["", "nonsense", "-1", "101", "1e9"])
+def test_setpos_ignores_a_percentage_it_cannot_use(logged_client, user, sample_library, percent):
+    bid = Book.objects.first().id
+    bookshelf.objects.create(user=user, book_id=bid, percent=0.5)
+    logged_client.get(reverse("web:setpos", args=[bid]), {"pos": "3.1", "percent": percent})
+    shelf = bookshelf.objects.get(user=user, book_id=bid)
+    assert shelf.position == "3.1"
+    assert shelf.percent == pytest.approx(0.5)
+
+
+@pytest.mark.django_db
+def test_setpos_without_a_percentage_leaves_progress_alone(logged_client, user, sample_library):
+    bid = Book.objects.first().id
+    bookshelf.objects.create(user=user, book_id=bid, percent=0.5)
+    logged_client.get(reverse("web:setpos", args=[bid]), {"pos": "3.1"})
+    assert bookshelf.objects.get(user=user, book_id=bid).percent == pytest.approx(0.5)
+
+
+@pytest.mark.django_db
 def test_bsdel_removes_book(logged_client, user, sample_library):
     bid = Book.objects.first().id
     bookshelf.objects.create(user=user, book_id=bid)

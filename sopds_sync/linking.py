@@ -111,6 +111,22 @@ def status_for(percentage):
     return ''
 
 
+#: How definite each status is. Progress may raise a book's status but never
+#: lower it: 'reading' must not undo 'read', and neither may overwrite a choice
+#: the reader made by hand.
+STATUS_RANK = {'': 0, bookshelf.STATUS_TO_READ: 0,
+               bookshelf.STATUS_READING: 1, bookshelf.STATUS_READ: 2}
+
+
+def raise_status(shelf, percentage):
+    """Lift `shelf.status` to the one `percentage` implies. True if it moved."""
+    status = status_for(percentage)
+    if STATUS_RANK.get(status, 0) > STATUS_RANK.get(shelf.status, 0):
+        shelf.status = status
+        return True
+    return False
+
+
 def record_progress(user, book, percentage, when=None):
     """Reflect e-reader progress onto the user's shelf entry for `book`.
 
@@ -130,13 +146,7 @@ def record_progress(user, book, percentage, when=None):
         shelf.percent = percentage
         fields.append('percent')
 
-    status = status_for(percentage)
-    # 'reading' must not overwrite 'read'; an explicit choice by the user is not
-    # overwritten by a lower one either.
-    rank = {'': 0, bookshelf.STATUS_TO_READ: 0,
-            bookshelf.STATUS_READING: 1, bookshelf.STATUS_READ: 2}
-    if rank.get(status, 0) > rank.get(shelf.status, 0):
-        shelf.status = status
+    if raise_status(shelf, percentage):
         fields.append('status')
 
     if fields:
