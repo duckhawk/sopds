@@ -56,7 +56,15 @@ def _record(user, path, marker, book, rule):
         })
 
 
-def _identify(name, marker):
+def _settled_rule(user, path):
+    """The rule an earlier marker at this path settled on, if any."""
+    return (MoonReaderPosition.objects
+            .filter(user=user, path=path)
+            .values_list('rule', flat=True)
+            .first()) or None
+
+
+def _identify(name, marker, prefer=None):
     """``(book, outline)`` for a device file name — the marker breaking ties.
 
     A name like "Title - Author.fb2" routinely matches several editions of the
@@ -70,13 +78,16 @@ def _identify(name, marker):
     and the name was ambiguous, no book is returned at all: crediting reading
     progress to an arbitrary one of several editions would be a guess, and a
     silent one.
+
+    `prefer` carries forward the chapter numbering an earlier marker for this
+    same file settled on, so it does not drift from one sync to the next.
     """
     candidates = linking.resolve_books_by_name(name)
     if not candidates:
         return None, None
     if len(candidates) == 1:
         book = candidates[0]
-        return book, moonpos.fit(book, marker)[0]
+        return book, moonpos.fit(book, marker, prefer=prefer)[0]
 
     # Editions of one novel differ by a few tenths of a percent, well inside the
     # tolerance, so several of them routinely pass. The closest reproduction is
@@ -84,7 +95,7 @@ def _identify(name, marker):
     # deciding by database id.
     best, best_gap, best_outline = None, None, None
     for book in candidates:
-        outline, gap = moonpos.fit(book, marker)
+        outline, gap = moonpos.fit(book, marker, prefer=prefer)
         if outline is not None and (best_gap is None or gap < best_gap):
             best, best_gap, best_outline = book, gap, outline
 
@@ -115,7 +126,7 @@ def ingest(user, path, full_path):
             return None
 
         name = moonreader.book_name(path)
-        book, outline = _identify(name, marker)
+        book, outline = _identify(name, marker, _settled_rule(user, path))
         if book is None:
             # Worth keeping even so: the marker is the user's data, and a book
             # added to the catalogue later can be matched on the next upload.
@@ -125,20 +136,16 @@ def ingest(user, path, full_path):
 
         _record(user, path, marker, book, outline.rule if outline else '')
 
-        was = bookshelf.objects.filter(user=user, book=book).values_list(
-            'percent', flat=True).first()
         shelf = linking.record_progress(user, book, marker.fraction)
         if shelf is None or outline is None:
             return shelf
 
-        # Forward only, exactly as the percentage is: a second device reporting
-        # a stale position must not drag the reading place backwards either, or
-        # the two halves of the shelf row would start telling different stories.
-        if was is not None and marker.fraction < was:
-            return shelf
-
-        # The coordinates check out against our copy, so they can be turned into
-        # a place in the text the browser reader understands.
+        # The newest marker for a file is where that reader is, so the place in
+        # the text follows it without asking whether the percentage went up.
+        # Gating it on the shelf's percentage was wrong twice over: the browser
+        # reader keeps that figure on its own scale, so the comparison was
+        # between unlike numbers, and losing it left the reading place frozen
+        # while the phone moved on.
         paragraph = outline.resume_paragraph(marker.chapter, marker.offset)
         if paragraph and paragraph != shelf.position:
             shelf.position = paragraph

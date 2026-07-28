@@ -143,8 +143,45 @@ def test_fit_accepts_the_rule_that_reproduces_the_percentage(book):
     outline = outline_for(book)
     fitted, gap = moonpos.fit(book, marker_at(outline, 5, 400))
     assert fitted is not None
-    assert gap <= moonpos.PERCENT_TOLERANCE
+    assert gap == pytest.approx(0.0, abs=0.1)
     assert fitted.percent_at(5, 400) == pytest.approx(outline.percent_at(5, 400))
+
+
+@pytest.mark.django_db
+def test_fit_survives_a_copy_that_measures_slightly_differently(book):
+    # Moon+ Reader and this catalogue rarely agree on a book's length to the
+    # character, and the disagreement is proportional: one real copy runs 2.5%
+    # shorter than the phone reckons, which is nothing in chapter two and 0.7
+    # percentage points by chapter ten. Testing the reported percentage against
+    # the chapter it names, rather than against a percentage replayed exactly,
+    # is what keeps that from switching sync off part-way through a book.
+    outline = outline_for(book)
+    chapter = 8
+    stretched = outline.percent_at(chapter, 0) * 1.025
+    assert abs(stretched - outline.percent_at(chapter, 0)) > 0.6
+    fitted, _gap = moonpos.fit(book, moonreader.Marker(DEVICE, chapter, 0, 0, stretched))
+    assert fitted is not None
+    assert fitted.resume_paragraph(chapter, 0) == outline.resume_paragraph(chapter, 0)
+
+
+@pytest.mark.django_db
+def test_fit_still_rejects_a_percentage_from_another_chapter(book):
+    outline = outline_for(book)
+    # Far enough out to land in a different chapter: that is a real mismatch,
+    # not a difference of measure.
+    elsewhere = outline.percent_at(12, 0)
+    assert moonpos.fit(book, moonreader.Marker(DEVICE, 3, 0, 0, elsewhere)) == (None, None)
+
+
+@pytest.mark.django_db
+def test_an_offset_cannot_run_past_the_chapter_it_names(book):
+    # The offset is in the phone's units and drifts against ours over a long
+    # chapter. The chapter is the part we have evidence for, so the position
+    # stays inside it however far the count has slipped.
+    outline = outline_for(book)
+    pid = outline.resume_paragraph(4, 10 ** 9)
+    assert outline.char_at(pid) >= outline.starts[4]
+    assert outline.char_at(pid) < outline.chapter_end(4)
 
 
 @pytest.mark.django_db
@@ -298,11 +335,11 @@ def test_the_closest_edition_wins_not_the_first(client, user, book, monkeypatch)
 
     real_fit = moonpos.fit
 
-    def fake_fit(candidate, m):
+    def fake_fit(candidate, m, prefer=None):
         if candidate.id == near.id:
             gap = abs(off_by_a_little.percent_at(m.chapter, m.offset) - m.percent)
             return off_by_a_little, gap
-        return real_fit(book, m)
+        return real_fit(book, m, prefer=prefer)
 
     monkeypatch.setattr(linking, 'resolve_books_by_name', lambda name: [near, book])
     monkeypatch.setattr(moonsync.moonpos, 'fit', fake_fit)
@@ -310,6 +347,40 @@ def test_the_closest_edition_wins_not_the_first(client, user, book, monkeypatch)
 
     put_marker(client, 'The Sanctuary Sparrow.fb2', marker)
     assert MoonReaderPosition.objects.get(user=user).book == book
+
+
+@pytest.mark.django_db
+def test_the_chapter_numbering_does_not_drift_between_syncs(client, user, book):
+    # Near the front of a book several readings of "table of contents entry"
+    # account for the same marker, and neighbouring ones number their chapters
+    # differently — settling on one and keeping it is what stops a write-back
+    # naming chapter nine where the phone means ten.
+    make_cache_dir(client)
+    outline = outline_for(book)
+    put_marker(client, FB2, marker_at(outline, 6, 0))
+    settled = MoonReaderPosition.objects.get(user=user).rule
+    assert settled
+
+    for chapter in (2, 9, 3, 12):
+        put_marker(client, FB2, marker_at(outline_for(book, settled), chapter, 0))
+        assert MoonReaderPosition.objects.get(user=user).rule == settled
+
+
+@pytest.mark.django_db
+def test_a_settled_rule_that_stops_working_is_replaced(client, user, book, monkeypatch):
+    # Stickiness must not become stubbornness: a rule that no longer accounts
+    # for what the phone reports has to give way, or a book renamed onto a
+    # different edition would never sync again.
+    make_cache_dir(client)
+    outline = outline_for(book)
+    put_marker(client, FB2, marker_at(outline, 6, 0))
+    # 'titled' cannot account for anything in this book: it has no section
+    # titles at all, so that reading yields no chapters to land in.
+    MoonReaderPosition.objects.filter(user=user).update(rule='titled')
+
+    put_marker(client, FB2, marker_at(outline, 7, 0))
+    row = MoonReaderPosition.objects.get(user=user)
+    assert row.rule and row.rule != 'titled'
 
 
 @pytest.mark.django_db
@@ -389,12 +460,15 @@ def test_progress_only_moves_forward(client, user, book):
     outline = outline_for(book)
     put_marker(client, FB2, marker_at(outline, 8, 0))
     ahead = bookshelf.objects.get(user=user, book=book)
-    # A second device reporting a stale position must not wind the shelf back —
-    # neither the percentage nor the place in the text.
+    # How far the book has been read never goes down…
     put_marker(client, FB2, marker_at(outline, 3, 0))
     now = bookshelf.objects.get(user=user, book=book)
     assert now.percent == pytest.approx(ahead.percent)
-    assert now.position == ahead.position
+    # …but the reading place follows the newest marker, because that is where
+    # the reader is. Holding it back to protect the percentage left the browser
+    # reader stuck on a chapter the phone had long since left.
+    assert now.position == outline.resume_paragraph(3, 0)
+    assert now.position != ahead.position
 
 
 # --- out: the browser reader saves a position ------------------------------

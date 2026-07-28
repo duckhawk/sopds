@@ -42,14 +42,11 @@ logger = logging.getLogger(__name__)
 
 FB2_NS = '{http://www.gribuser.ru/xml/fictionbook/2.0}'
 
-#: How far a replayed percentage may sit from the one the device reported and
-#: still count as the same book. Moon+ Reader rounds to a tenth, and its idea of
-#: what counts as a character will not match ours down to the last space, so the
-#: window has to be wider than the rounding alone. It stays far below the gap
-#: between neighbouring chapters of a real book, which is what it has to
-#: distinguish: the sample markers land within 0.05 of their prediction, while
-#: chapters sit percent apart.
-PERCENT_TOLERANCE = 0.6
+#: Slack on the ends of a chapter's span, in percent of the whole book, when
+#: asking whether a reported percentage falls inside it. Absorbs Moon+ Reader's
+#: rounding to a tenth and the ragged edge where our idea of the text and its
+#: own disagree about a heading or a footnote.
+SPAN_SLACK = 0.15
 
 #: Candidate readings of "entry in the table of contents", most specific first.
 #: `titled` restricts to sections carrying a <title>; `top_level` to sections
@@ -88,6 +85,53 @@ class Outline:
             return None
         return 100.0 * (self.starts[chapter] + offset) / self.total
 
+    def chapter_end(self, chapter):
+        """Character offset one past the end of a chapter's text.
+
+        Skips chapters that start at the same place: a section carrying a title
+        but no text of its own before the next one gives an empty span, and an
+        empty span cannot contain anything.
+        """
+        for start in self.starts[chapter + 1:]:
+            if start > self.starts[chapter]:
+                return start
+        return self.total
+
+    def span(self, chapter):
+        """``(from, to)`` in percent of the whole book, or None."""
+        if not self.total or not (0 <= chapter < len(self.starts)):
+            return None
+        return (100.0 * self.starts[chapter] / self.total,
+                100.0 * self.chapter_end(chapter) / self.total)
+
+    def contains(self, chapter, percent):
+        """Could a reader at `percent` of the book be in this chapter?
+
+        This, rather than reproducing the reported percentage exactly, is what
+        says our copy is divided up the way the phone's copy is. The two texts
+        rarely measure the same to the character — a catalogue copy of one book
+        here runs 2.5% shorter than Moon+ Reader reckons it — and that error is
+        proportional, so it is invisible in chapter two and fatal by chapter ten.
+        Asking which chapter the percentage lands in does not care about the
+        scale, only about the divisions, which is the thing being tested.
+        """
+        bounds = self.span(chapter)
+        if bounds is None:
+            return False
+        return bounds[0] - SPAN_SLACK <= percent <= bounds[1] + SPAN_SLACK
+
+    def char_for(self, chapter, offset):
+        """Where in our text a marker's coordinates point, held to its chapter.
+
+        The offset is in the phone's units, so over a long chapter it drifts
+        against ours; clamping keeps it from running past the chapter the marker
+        named, which is the part we have evidence for.
+        """
+        if not 0 <= chapter < len(self.starts):
+            return None
+        start = self.starts[chapter]
+        return min(start + offset, max(start, self.chapter_end(chapter) - 1))
+
     def paragraph_at(self, char_offset, not_before=None):
         """The browser reader's paragraph id at a character offset, or None.
 
@@ -117,10 +161,10 @@ class Outline:
 
     def resume_paragraph(self, chapter, offset):
         """Where the browser reader should open for a device's coordinates."""
-        if not 0 <= chapter < len(self.starts):
+        char_offset = self.char_for(chapter, offset)
+        if char_offset is None:
             return None
-        start = self.starts[chapter]
-        return self.paragraph_at(start + offset, not_before=start)
+        return self.paragraph_at(char_offset, not_before=self.starts[chapter])
 
     def char_at(self, paragraph_id):
         """The character offset a browser-reader paragraph id sits at, or None."""
@@ -226,6 +270,34 @@ def _parse(book):
         return None
 
 
+#: The rule to use when the question is only how long the text is and where a
+#: paragraph sits in it. Chapter divisions do not come into that, and every rule
+#: measures the paragraphs identically, so any of them would do.
+MEASURE_RULE = 'all'
+
+
+def fraction_at_paragraph(book, paragraph_id):
+    """How far through the book a browser-reader paragraph sits, 0..1, or None.
+
+    The browser readers work their progress out from how far the window has
+    scrolled, which counts pictures, headings and margins, and in chapter mode
+    is not even that — it is the chapter number. Moon+ Reader counts characters.
+    Left alone the two write incompatible figures into the same shelf column,
+    each overwriting the other, and the number stops meaning anything. Counting
+    characters here puts the browser on the phone's scale.
+
+    None when the book is not one we can measure (anything but FB2, or a file we
+    cannot read), and for the paged reader, whose position is a page number.
+    """
+    outline = for_rule(book, MEASURE_RULE)
+    if outline is None or not outline.total:
+        return None
+    char_offset = outline.char_at(paragraph_id)
+    if char_offset is None:
+        return None
+    return max(0.0, min(1.0, char_offset / outline.total))
+
+
 def candidates(book):
     """An :class:`Outline` per candidate rule, or None if the book is unusable."""
     root = _parse(book)
@@ -274,9 +346,9 @@ def for_rule(book, rule_name):
     return outline
 
 
-def fit(book, marker):
-    """``(outline, gap)`` for the rule whose replay of `marker` reproduces its
-    percentage, or ``(None, None)``.
+def fit(book, marker, prefer=None):
+    """``(outline, gap)`` for the rule that accounts for `marker`, or
+    ``(None, None)``.
 
     This is the check that decides whether we may write coordinates back: a hit
     means our copy is divided into chapters the same way and measures the same
@@ -286,6 +358,13 @@ def fit(book, marker):
     catalogue can hold several editions of a novel, all of them close enough to
     pass, and how closely each reproduced the marker is the only thing left to
     tell them apart.
+
+    `prefer` names a rule an earlier marker for this book already settled on, and
+    it wins whenever it still accounts for the marker. Near the front of a book
+    the chapters are close together and several rules fit, so the closest one
+    changes from sync to sync — and neighbouring rules number their chapters
+    differently, which would have us writing chapter nine where the phone means
+    ten. A rule that keeps working is worth more than the closest one.
     """
     built = candidates(book)
     if not built:
@@ -293,11 +372,18 @@ def fit(book, marker):
 
     best, best_gap = None, None
     for outline in built:
-        predicted = outline.percent_at(marker.chapter, marker.offset)
-        if predicted is None:
+        if not outline.contains(marker.chapter, marker.percent):
             continue
+        if outline.rule == prefer:
+            cache.set(_cache_key(book, outline.rule), outline, 24 * 3600)
+            return outline, abs(outline.percent_at(marker.chapter, marker.offset)
+                                - marker.percent)
+        # Accepted on the chapter it lands in; ranked on how closely the exact
+        # coordinates replay, which is what separates two editions of one novel
+        # when both divide it up the same way.
+        predicted = outline.percent_at(marker.chapter, marker.offset)
         gap = abs(predicted - marker.percent)
-        if gap <= PERCENT_TOLERANCE and (best_gap is None or gap < best_gap):
+        if best_gap is None or gap < best_gap:
             best, best_gap = outline, gap
 
     if best is not None:
